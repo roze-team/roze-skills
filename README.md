@@ -11,6 +11,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Generated REST service structure with Axum, Tower, and Roze middleware
 - Generated RPC service structure with tonic/prost and Roze context/error metadata
 - Application-owned vs generator-owned file boundaries
+- Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers
 - Toasty and SeaORM model generation patterns
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
 - Config, registry, gateway, MQ, cache, DTM, metrics, tracing, and production smoke checks

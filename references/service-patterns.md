@@ -35,6 +35,8 @@ Ownership rules:
 
 REST responses should use `roze-result::ApiResponse`. HTTP errors should use Roze error types and helpers instead of custom JSON.
 
+Prefer generated REST adapters and Roze HTTP helpers for request extraction, response wrapping, validation, timeout metadata, context propagation, middleware ordering, health, metrics, and OpenAPI exposure. Add custom Axum/Tower layers only after confirming the generated middleware/config surface cannot express the behavior.
+
 ## REST Operational Endpoints
 
 Generated REST services expose:
@@ -76,6 +78,8 @@ Ownership rules:
 - `src/svc/mod.rs` owns service dependencies only.
 
 RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, request id, trace id, and locale.
+
+Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 
 ## API Contract Syntax
 
@@ -131,5 +135,7 @@ Service-wide REST middleware lives under `rest.middlewares` in `config.yaml`. Bu
 Route-scoped middleware declared in `.api` is resolved as built-in first. Unknown names generate custom application middleware files.
 
 Built-in names include `auth`, `jwt`, `trace`, `recover`, `stat`, `prometheus`, `metrics`, `cors`, `timeout`, `rate_limit`, `breaker`, `max_conns`, `shedding`, `gunzip`, `body_limit`, and `idempotency`.
+
+Prefer built-in middleware names in `.api` annotations and `config.yaml` before generating custom middleware files. Custom middleware should focus on product-specific behavior and should still preserve Roze request context, tracing spans, metrics labels, error shape, and timeout/cancellation behavior.
 
 Business logic should log with `tracing` macros directly. Do not pass or construct trace ids manually; Roze middleware carries trace ids in the request span.
