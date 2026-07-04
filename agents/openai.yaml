@@ -1,0 +1,6 @@
+interface:
+  display_name: "Roze Skills"
+  short_description: "Build and troubleshoot Roze Rust microservices."
+  default_prompt: "Use $roze-skills to generate or review a Roze service with rozectl."
+policy:
+  allow_implicit_invocation: true
