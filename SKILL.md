@@ -7,6 +7,8 @@ description: Roze Rust microservice framework knowledge for AI agents. Use when 
 
 Use this skill to build, modify, review, or troubleshoot projects based on the Roze Rust microservice framework.
 
+Treat the active Roze checkout as the source of truth. This skill gives stable guidance and navigation, but agents must inspect the target repository before changing code, generated templates, docs, tests, or public command behavior.
+
 Roze is IDL-first and convention-driven:
 
 - Define REST routes, RPC methods, DTOs, and annotations in `.api` or `.proto` contracts.
@@ -27,13 +29,13 @@ Read only the files relevant to the current task:
 
 ## Core Workflow
 
-1. Inspect the target Roze checkout first: read `README.md`, relevant `docs/usage/*`, `docs/contracts/*`, `apps/rozectl`, and the touched `crates/roze-*` modules.
+1. Inspect the target Roze checkout first: read `README.md`, `docs/project-standards.md`, relevant `docs/usage/*`, `docs/contracts/*`, `apps/rozectl`, and the touched `crates/roze-*` modules.
 2. Identify whether the task touches generated code, runtime crates, application logic, docs, or tests.
 3. If changing generated output, update the generator/templates/tests in `apps/rozectl` rather than hand-editing generated glue.
 4. If changing a generated service, keep application behavior in `src/logic/**`, `src/middleware/*.rs`, `src/model/_ext.rs`, or app-owned modules.
 5. Prefer `--update` for regeneration. Use `--force` only for intentional full rebuilds.
 6. Run focused verification. For generator work, include `cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo` unless the task needs real database inspect coverage.
-7. Sync docs when public commands, runtime contracts, generated layouts, config fields, or production behavior change.
+7. Sync docs and this skill when public commands, runtime contracts, generated layouts, config fields, or production behavior change.
 
 ## Roze Principles
 
