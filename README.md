@@ -19,29 +19,6 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 
 ## Install
 
-### Skills Manager
-
-You can manage this skill with [Skills Manager](https://github.com/xingkongliang/skills-manager), which supports installing skills from Git repositories and syncing them to Codex, Claude Code, Cursor, and other agent workspaces.
-
-In the desktop app:
-
-1. Open **Library**.
-2. Choose **Install Skills**.
-3. Install from Git URL:
-
-```text
-https://github.com/roze-team/roze-skills.git
-```
-
-4. Add it to the desired global or project workspace and sync it to Codex.
-
-With the Skills Manager CLI from a local `skills-manager` checkout:
-
-```bash
-npm run cli -- skills install https://github.com/roze-team/roze-skills.git
-npm run cli -- skills sync --tool codex
-```
-
 Install as a project-level skill:
 
 ```bash
