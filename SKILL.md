@@ -1,6 +1,6 @@
 ---
 name: roze-skills
-description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api or .proto contracts, generated Rust REST/RPC services, Roze crates such as roze-http/roze-rpc/roze-config/roze-mq/roze-search, service governance, middleware, model/search generation, OpenAPI/SDK generation, production smoke tests, or troubleshooting Roze project conventions.
+description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api or .proto contracts, generated Rust REST/RPC services, Roze crates such as roze-http/roze-rpc/roze-config/roze-mq/roze-search, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service governance, middleware, model/search generation, OpenAPI/SDK generation, production smoke tests, or troubleshooting Roze project conventions.
 ---
 
 # Roze Skills
@@ -26,6 +26,7 @@ Read only the files relevant to the current task:
 - [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC layouts, handler/server adapters, logic placement, service context, validation, context propagation, errors, middleware, and health endpoints.
 - [references/data-search-patterns.md](references/data-search-patterns.md): use for model generation, Toasty, SeaORM, SQL/Mongo inspection, repository boundaries, search DSL/inspection, and Elasticsearch/OpenSearch/Meilisearch support.
 - [references/governance-operations.md](references/governance-operations.md): use for config, registry, gateway, MQ, DTM, cache, metrics, tracing, production checks, smoke scripts, and hot-path expectations.
+- [references/rust-engineering.md](references/rust-engineering.md): use for Rust ownership/lifetime, error handling, async/concurrency, resource lifecycle, dependencies, performance, unsafe/FFI, refactoring, and code-review patterns that apply inside Roze crates or generated services.
 - [references/troubleshooting.md](references/troubleshooting.md): use when diagnosing generator issues, mixed API/RPC contracts, regeneration overwrites, validator mappings, config failures, dependency stack problems, or tests to run.
 
 ## Core Workflow

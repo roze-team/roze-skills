@@ -12,6 +12,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Generated RPC service structure with tonic/prost and Roze context/error metadata
 - Application-owned vs generator-owned file boundaries
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers
+- Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe, refactoring, and review
 - Toasty and SeaORM model generation patterns
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
 - Config, registry, gateway, MQ, cache, DTM, metrics, tracing, and production smoke checks
@@ -61,6 +62,7 @@ roze-skills/
     service-patterns.md
     data-search-patterns.md
     governance-operations.md
+    rust-engineering.md
     troubleshooting.md
 ```
 
