@@ -22,6 +22,12 @@ Generate RPC from proto3:
 cargo run -p rozectl -- rpc protoc example/user.proto --out apps/user-rpc --roze-source path
 ```
 
+Generate a stream worker scaffold from event-capable RPC/API contracts:
+
+```bash
+cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --roze-source path
+```
+
 Regenerate framework-owned files while preserving application-owned files:
 
 ```bash
@@ -32,9 +38,11 @@ Use `--update` for normal regeneration. It preserves:
 
 - REST `src/logic/**.rs`
 - RPC `src/logic/*.rs`
+- custom declarations in RPC `src/logic/mod.rs`
+- stream `src/stream/consumer.rs`
 - REST custom `src/middleware/*.rs`
 - `config.yaml`
-- model extension file `src/model/_ext.rs` when model generation supports it
+- model extension files `src/model/*_ext.rs`
 
 Use `--force` only for a deliberate full rebuild.
 
@@ -121,3 +129,19 @@ rozectl kube deploy --name user-api --image registry.example.com/user-api:latest
 ```
 
 Keep generated deployment files aligned with public docs and smoke scripts whenever command flags or defaults change.
+
+## Generator Smoke Checks
+
+For ordinary parser/generator changes:
+
+```bash
+cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo
+```
+
+Generated REST, RPC, stream, Toasty, and SeaORM templates also have ignored compile-smoke tests that create temporary crates and run `cargo check`, plus `cargo clippy --all-targets -- -D warnings` where applicable:
+
+```bash
+cargo test -p rozectl -- --ignored --skip postgres --skip mysql --skip mongo
+```
+
+Run database-specific tests only when local credentials or compose dependencies are available.

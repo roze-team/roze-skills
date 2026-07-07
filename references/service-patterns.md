@@ -81,6 +81,19 @@ RPC servers should restore request context with `roze_rpc::rpc::request_context`
 
 Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 
+`rozectl rpc protoc --update` should preserve custom module declarations in `src/logic/mod.rs` as well as application-owned files under `src/logic/**`.
+
+## Stream Worker Layout
+
+Generated stream workers use Roze MQ primitives and are beta-level scaffolds. They generate producer, consumer, envelope, config, type, and README files from event-capable contracts.
+
+Ownership rules:
+
+- `src/stream/consumer.rs` owns business message handling and is preserved by `--update`.
+- generated envelope/type/config glue is generator-owned.
+- stream consumers should use `roze_mq::{Delivery, Subscriber}` and make `ack`, `nack`, retry, dead-letter, and idempotency behavior explicit.
+- stream handlers should preserve Roze tracing/context conventions and avoid blocking async worker tasks.
+
 ## API Contract Syntax
 
 Roze `.api` files support:

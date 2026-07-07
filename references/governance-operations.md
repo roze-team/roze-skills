@@ -72,6 +72,7 @@ Run targeted crate tests for local changes. Useful slices:
 
 ```bash
 cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo
+cargo test -p rozectl -- --ignored --skip postgres --skip mysql --skip mongo
 cargo test -p roze-rpc
 cargo test -p roze-config
 cargo test -p roze-mq
