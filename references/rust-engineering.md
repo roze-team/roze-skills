@@ -185,6 +185,77 @@ Prefer:
 - `Atomic*`, `Mutex`, or `RwLock` over `static mut`.
 - `bindgen`/`cbindgen` for FFI bindings when appropriate.
 
+### Unsafe Review Checklist
+
+Use this checklist before accepting unsafe code in Roze runtime crates, generated helpers, or application extension points:
+
+- Confirm the unsafe block is necessary. If the goal is only to avoid ownership, lifetime, or borrow-checker friction, redesign with safe Rust.
+- Keep unsafe blocks small and wrapped by a safe API whenever possible.
+- Require a `// SAFETY:` comment for every unsafe block that states the invariant, who upholds it, and why the operation is sound.
+- Require `# Safety` docs for every public `unsafe fn`; document caller obligations, valid input ranges, aliasing rules, lifetime requirements, and thread-safety assumptions.
+- Validate raw pointers before dereference: non-null, aligned, initialized, within allocation bounds, and valid for the required lifetime.
+- Avoid creating `&T` or `&mut T` from raw pointers unless Rust aliasing rules are actually satisfied.
+- Prefer `NonNull<T>` for stored non-null pointers and `PhantomData` when a wrapper owns or borrows data not visible in its fields.
+- Prefer `MaybeUninit<T>` for initialization protocols; avoid invalid zeroed values, especially references, enums, bools, and non-zero types.
+- Check `#[repr(C)]`, field layout, padding, alignment, and endian assumptions for FFI or binary layout code.
+- Do not let Rust panics cross FFI boundaries; catch or prevent panics around `extern "C"` callbacks.
+- Define allocation ownership across FFI: which side allocates, which side frees, and which function performs release.
+- Keep `CString`/buffer owners alive while passing raw pointers to C; never pass a pointer from a temporary.
+- Do not manually `Drop` memory owned by foreign code, and do not let Rust automatically drop foreign-owned memory.
+- For `impl Send` or `impl Sync`, verify synchronization, aliasing, and lifetime invariants under concurrent access.
+- Add tests around boundary conditions and run `cargo miri` when the target crate and dependencies support it.
+
+Roze-specific unsafe guidance:
+
+- Generated service glue should almost never need unsafe. If unsafe appears in generator output, treat it as a design smell and require a generator test plus a safety rationale.
+- Runtime crates should expose safe abstractions to generated services and app code; unsafe should stay behind narrow crate-local boundaries.
+- FFI or low-level integrations must preserve Roze context, error, tracing, and shutdown behavior at the safe wrapper boundary.
+
+## Web And Cloud-Native Roze Services
+
+Use this guidance when working on generated REST/RPC/stream services, gateway-facing code, MQ consumers, service discovery, config, or deployment behavior.
+
+Core constraints:
+
+- Handlers and RPC methods are async service entry points. Do not block them with synchronous I/O, CPU-heavy loops, `thread::sleep`, or long-held locks.
+- Shared service state must be thread-safe. Use `ServiceContext` with `Arc`-backed clients, pools, registries, caches, and publishers.
+- Request-scoped data belongs in extractors, Roze context, function arguments, or local variables; do not place it in application-wide state.
+- Cross-cutting behavior belongs in Roze middleware, gateway governance, RPC metadata, MQ envelope handling, or generated adapters before custom local code.
+- Every protocol boundary should preserve request id, trace id, tenant, locale, auth metadata, deadline/cancellation intent, structured errors, logs, and metrics labels.
+- Readiness should report real dependency state through Roze health checks rather than ad hoc endpoints.
+
+REST/API guidance:
+
+- Prefer generated route/handler/logic boundaries. Keep handlers thin and move business behavior into `src/logic/**`.
+- Use generated DTO validation and Roze response/error helpers before writing custom extractors or response envelopes.
+- Prefer built-in middleware for trace, recover, metrics, CORS, timeout, rate limit, breaker, max connections, shedding, gunzip, body limit, auth/JWT, and idempotency.
+- Add custom Tower/Axum layers only when the built-in config/middleware surface cannot express the behavior, and preserve Roze context and metrics.
+- Avoid per-request client construction. Put HTTP clients, DB handles, registry clients, cache clients, MQ publishers, and search clients in `ServiceContext`.
+
+RPC and service-discovery guidance:
+
+- Prefer generated tonic server/client adapters and `roze_rpc` context/error metadata helpers.
+- Pass `&roze_context::Context` through app-owned logic when downstream calls need request metadata.
+- Use Roze registry/cached resolver/gateway discovery surfaces before adding service-discovery code.
+- Treat timeout, retry, breaker, rate-limit, fallback, and outlier behavior as governance configuration. Do not hide it inside business logic.
+
+Stream/MQ guidance:
+
+- Use `roze_mq`, `roze_kafka`, or `roze_nats` abstractions before broker-specific app code.
+- Make ack, nack, retry, DLQ, replay, idempotency, and envelope version behavior explicit.
+- Keep handlers idempotent where retries are possible.
+- Do not block consumer tasks; offload CPU-heavy work and bound concurrency where needed.
+- Emit topic, group, partition, offset, attempt, outcome, request/trace id, and error kind where available.
+
+Cloud-native review checklist:
+
+- Does startup fail fast for invalid required config, and preserve last-good config during hot reload failures?
+- Are `/healthz`, `/readyz`, `/startupz`, `/metrics`, or protocol equivalents backed by Roze health/metrics primitives?
+- Are shutdown and cancellation paths clear for HTTP, RPC, stream workers, background tasks, and pools?
+- Are retries bounded and limited to transient errors?
+- Are generated files left generator-owned and business changes kept in application-owned extension points?
+- Are deployment artifacts, smoke scripts, and docs updated when public behavior changes?
+
 ## Refactoring And Review
 
 For Rust refactors, analyze impact before editing:

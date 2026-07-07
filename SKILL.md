@@ -35,7 +35,7 @@ Read only the files relevant to the current task:
 2. Identify whether the task touches generated code, runtime crates, application logic, docs, or tests.
 3. Check whether Roze already provides the needed capability through `rozectl`, a generated extension point, or a `roze-*` crate before writing custom framework code.
 4. If changing generated output, update the generator/templates/tests in `apps/rozectl` rather than hand-editing generated glue.
-5. If changing a generated service, keep application behavior in `src/logic/**`, `src/middleware/*.rs`, `src/model/_ext.rs`, or app-owned modules.
+5. If changing a generated service, keep application behavior in `src/logic/**`, `src/middleware/*.rs`, `src/model/*_ext.rs`, `src/stream/consumer.rs`, or app-owned modules.
 6. Prefer `--update` for regeneration. Use `--force` only for intentional full rebuilds.
 7. Run focused verification. For generator work, include `cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo` unless the task needs real database inspect coverage.
 8. Sync docs and this skill when public commands, runtime contracts, generated layouts, config fields, or production behavior change.
