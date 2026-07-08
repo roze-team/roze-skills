@@ -1,6 +1,6 @@
 ---
 name: roze-skills
-description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze crates such as roze-http/roze-rpc/roze-config/roze-mq/roze-search, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service governance, middleware, model/search generation, ent-style query/create/update/delete/projection/sum builders, OpenAPI/SDK generation, production smoke tests, or troubleshooting Roze project conventions.
+description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze crates such as roze-http/roze-rpc/roze-service/roze-config/roze-mq/roze-search, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, service governance, middleware, model/search generation, ent-style query/create/update/delete/projection/sum builders, OpenAPI/SDK generation, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
 ---
 
 # Roze Skills
@@ -22,10 +22,10 @@ Roze is IDL-first and convention-driven:
 
 Read only the files relevant to the current task:
 
-- [references/rozectl-workflows.md](references/rozectl-workflows.md): use for `rozectl` commands, API/RPC generation, update vs force, OpenAPI, SDK, mock, contract, docker, kube, doctor, and dev stack workflows.
-- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, handler/server adapters, logic placement, service context, validation, context propagation, errors, middleware, health endpoints, and generated ownership.
+- [references/rozectl-workflows.md](references/rozectl-workflows.md): use for `rozectl` commands, API/RPC generation, update vs force, validate/format/diff, OpenAPI, SDK, mock, contract, quickstart/template/migrate, docker, kube, env/upgrade/completion, doctor, and dev stack workflows.
+- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, handler/server adapters, logic placement, service context, validation, context propagation, errors, middleware, health endpoints, lifecycle/bootstrap, and generated ownership.
 - [references/data-search-patterns.md](references/data-search-patterns.md): use for `.ent` model generation, Toasty, SeaORM, SQL/Mongo inspection, ent-style repository/client/query/mutation/projection/sum builders, decimal/smallint mappings, search DSL/inspection, and Elasticsearch/OpenSearch/Meilisearch support.
-- [references/governance-operations.md](references/governance-operations.md): use for config, registry, gateway, MQ, DTM, cache, metrics, tracing, production checks, smoke scripts, and hot-path expectations.
+- [references/governance-operations.md](references/governance-operations.md): use for config, registry, gateway, MQ, DTM, cache, lifecycle, metrics, tracing, release gates, production evidence, smoke/soak scripts, and hot-path expectations.
 - [references/rust-engineering.md](references/rust-engineering.md): use for Rust ownership/lifetime, error handling, async/concurrency, resource lifecycle, dependencies, performance, unsafe/FFI, refactoring, and code-review patterns that apply inside Roze crates or generated services.
 - [references/troubleshooting.md](references/troubleshooting.md): use when diagnosing generator issues, mixed API/RPC contracts, regeneration overwrites, validator mappings, config failures, dependency stack problems, or tests to run.
 
@@ -37,8 +37,9 @@ Read only the files relevant to the current task:
 4. If changing generated output, update the generator/templates/tests in `apps/rozectl` rather than hand-editing generated glue.
 5. If changing a generated service, keep application behavior in `src/logic/**`, `src/middleware/*.rs`, `src/model/*_ext.rs`, `src/stream/consumer.rs`, or app-owned modules.
 6. Prefer `--update` for regeneration. Use `--force` only for intentional full rebuilds.
-7. Run focused verification. For generator work, include `cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo` unless the task needs real database inspect coverage.
-8. Sync docs and this skill when public commands, runtime contracts, generated layouts, config fields, or production behavior change.
+7. Treat Roze as pre-release unless the active checkout's release policy, maturity matrix, and production evidence say otherwise. For production-path work, pin the Roze Git revision, review generated diffs, and run the documented smoke/release gates.
+8. Run focused verification. For generator work, include `cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo` unless the task needs real database inspect coverage.
+9. Sync docs and this skill when public commands, runtime contracts, generated layouts, config fields, lifecycle behavior, smoke scripts, or production behavior change.
 
 ## Roze Principles
 
@@ -47,6 +48,7 @@ Read only the files relevant to the current task:
 - Generated boundaries stay explicit: route registration, handlers, RPC adapters, protobuf include modules, DTOs, OpenAPI, and deployment files are generator-owned.
 - Application logic stays explicit: complex SQL, transactions, authorization, permission checks, domain validation, search ranking, and business orchestration are not invented by the generator.
 - Framework behavior should come from Roze first: prefer built-in middleware, `roze_context`, `roze_result`, `roze_error`, `roze_health`, `roze_config`, `roze_rpc`, `roze_gateway`, `roze_mq`, `roze_cache`, `roze_local_cache`, `roze_singleflight`, `roze_search`, and generated repositories before adding local equivalents.
+- Generated service entrypoints should use Roze lifecycle/bootstrap primitives where available, especially `roze_service::ServiceGroup`, health/readiness state, graceful shutdown, and generated readiness/draining behavior.
 - Context, errors, logs, metrics, config, registry, and middleware behavior should be uniform across REST, RPC, gateway, MQ, and jobs.
 
 ## Common Commands

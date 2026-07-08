@@ -68,6 +68,8 @@ DTM defaults to TCC. Saga is optional and should not weaken the default TCC stat
 
 ## Production And Smoke Verification
 
+Roze is currently pre-release. It is suitable for evaluation, internal pilots, and controlled production paths where teams pin a reviewed Git revision, inspect generated diffs, run smoke checks, and own production configuration, observability, rollback, auth, and dependency governance. Do not describe a module as production-stable unless the active checkout's maturity matrix and production evidence support that claim.
+
 Run targeted crate tests for local changes. Useful slices:
 
 ```bash
@@ -77,6 +79,7 @@ cargo test -p roze-rpc
 cargo test -p roze-config
 cargo test -p roze-mq
 cargo test -p roze-gateway
+cargo test -p roze-service -p roze-bootstrap -p roze-shutdown
 ```
 
 Project-level smoke scripts:
@@ -85,9 +88,12 @@ Project-level smoke scripts:
 bash scripts/production-smoke.sh
 bash scripts/production-smoke.sh --with-compose
 bash scripts/rozectl-smoke.sh
+bash scripts/release-gate.sh
 ```
 
 `--with-compose` starts integration dependencies such as etcd, consul, Kafka, NATS, Redis, Postgres, MySQL, MongoDB, Elasticsearch, OpenSearch, and Meilisearch.
+
+`scripts/release-gate.sh` is the high-signal local gate for formatting, clippy, Gateway, Config Center, MQ, lifecycle/bootstrap, `rozectl` smoke, generated compile smoke, and production smoke without external Compose dependencies.
 
 For external dependency verification:
 
@@ -96,6 +102,33 @@ scripts/roze-project-external-smoke.sh
 ```
 
 Production-grade adapters should cover real integration behavior, reconnects, retry, timeout, cancellation, metrics labels, trace/context propagation, and localized error responses.
+
+## Production Evidence And Soak
+
+Release gates and smoke scripts are not long-run production evidence. Runtime-critical modules need reproducible reports before stable claims.
+
+Use the built-in report scaffold instead of inventing ad hoc report formats:
+
+```bash
+bash scripts/production-evidence.sh \
+  --area lifecycle \
+  --duration 24h \
+  --workload "start, drain, shutdown, failed task, timeout hooks" \
+  --failure-injection "stuck task, signal shutdown, hook timeout" \
+  --command "ROZE_LIFECYCLE_SOAK_SECONDS=86400 bash scripts/production-soak-lifecycle.sh"
+```
+
+Short soak entrypoints validate the harness. Increase duration and workload before using them as evidence:
+
+```bash
+bash scripts/production-soak-mq.sh 300
+bash scripts/production-soak-config-center.sh 300
+bash scripts/production-soak-lifecycle.sh 300
+```
+
+Evidence reports should record the Roze Git revision, Rust toolchain, OS, command, dependency topology, workload, duration, success criteria, error budget, latency/throughput/resource trends, restart count, leak checks, failure injection timeline, and final verdict.
+
+Keep report verdicts conservative: use `inconclusive` until measurements and artifacts are filled in. Do not fabricate 24h/72h results or call beta/scaffold modules stable based only on short-run smoke checks.
 
 ## Documentation Sync
 

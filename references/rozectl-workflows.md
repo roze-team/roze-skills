@@ -4,6 +4,16 @@ Use this reference when a task involves generating, regenerating, diffing, docum
 
 ## Command Selection
 
+Inspect or maintain the installed CLI before generation work:
+
+```bash
+rozectl env
+rozectl upgrade --dry-run
+rozectl completion powershell
+```
+
+Use `cargo install --git https://github.com/roze-team/roze.git rozectl --force` or `cargo install --path apps/rozectl --force` when the active checkout requires a newer binary. Roze is pre-release; prefer a pinned Git revision for controlled production paths.
+
 Generate REST from `.api` route declarations:
 
 ```bash
@@ -46,7 +56,37 @@ Use `--update` for normal regeneration. It preserves:
 
 Use `--force` only for a deliberate full rebuild.
 
+Create starter projects through the same generator path:
+
+```bash
+rozectl quickstart user-api --kind api --out services/user-api
+rozectl quickstart user-rpc --kind rpc --out services/user-rpc
+rozectl api new user-api --out services/user-api
+rozectl rpc new user-rpc --out services/user-rpc
+```
+
+For teams migrating from goctl, prefer Roze's compatibility surface instead of custom conversion scripts:
+
+```bash
+rozectl migrate api --from go-zero --api user.api --out roze.api
+rozectl migrate api user.api --check
+rozectl migrate api user.api --write
+rozectl api go --api example/user.api --dir apps/roze-example
+```
+
+`quickstart`, `api new`, `rpc new`, and goctl-compatible generation can read starter templates from `--home`, `--remote`, and `--branch`.
+
 ## Dry Runs And Compatibility
+
+Validate and format contracts before generating or reviewing diffs:
+
+```bash
+rozectl api validate example/user.api
+rozectl api format example/user.api --check
+rozectl api format example/user.api --write
+```
+
+`api validate` catches duplicate types/fields/routes/RPC methods, invalid generated Rust identifiers, unknown request/response types, path parameter mismatches, middleware name collisions, and other generation-blocking contract errors.
 
 Preview changes without writing to the target:
 
@@ -63,6 +103,17 @@ rozectl contract check --old example/user.v1.api --new example/user.v2.api
 ```
 
 Treat removed routes, removed RPC methods, changed request/response types, removed fields, field source/type changes, and newly required fields as breaking unless the command documents otherwise.
+
+Inspect and maintain local or remote starter templates through built-in commands:
+
+```bash
+rozectl template list
+rozectl template show api
+rozectl template init --home templates
+rozectl template diff api --home templates
+rozectl template update api --home templates
+rozectl template revert api --home templates
+```
 
 ## Mock, Tests, OpenAPI, And SDKs
 
@@ -90,6 +141,9 @@ Generate clients:
 rozectl api client ts example/user.api --out sdk/user.ts
 rozectl api client js example/user.api --out sdk/user.js
 rozectl api client dart example/user.api --out sdk/user.dart
+rozectl api client java example/user.api --out sdk/RozeApiClient.java
+rozectl api client kotlin example/user.api --out sdk/RozeApiClient.kt
+rozectl api client swift example/user.api --out sdk/RozeApiClient.swift
 ```
 
 Generate Markdown API docs:
@@ -145,3 +199,11 @@ cargo test -p rozectl -- --ignored --skip postgres --skip mysql --skip mongo
 ```
 
 Run database-specific tests only when local credentials or compose dependencies are available.
+
+For release-sensitive generator work, run the explicit compile-smoke slices when relevant:
+
+```bash
+cargo test -p rozectl generated_rest_project_compiles_with_model_and_search -- --ignored
+cargo test -p rozectl generated_rpc_project_compiles -- --ignored
+cargo test -p rozectl generated_stream_project_compiles -- --ignored
+```
