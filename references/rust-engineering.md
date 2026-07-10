@@ -13,7 +13,7 @@ Common decision points:
 - Use owned values for domain entities, configuration snapshots, generated DTOs crossing async boundaries, and values stored in `ServiceContext`.
 - Use `&T` or `&str` for read-only views inside one call.
 - Use `&mut T` for local, exclusive mutation.
-- Use `Arc<T>` for shared application state across async tasks, Axum handlers, tonic services, registry clients, caches, pools, and background workers.
+- Use `Arc<T>` for shared application state across async tasks, Roze native HTTP handlers, tonic services, registry clients, caches, pools, and background workers.
 - Use `Cow<'_, str>` only when borrowed data may need mutation or normalization.
 - Clone value objects when duplication is domain-correct. Do not add `.clone()` only to silence ownership errors.
 
@@ -75,7 +75,7 @@ Roze-specific rules:
 - Generated REST handlers and RPC servers run in async contexts; do not block the executor with filesystem, CPU-heavy, sleep, or synchronous network calls.
 - Do not hold `MutexGuard`, `RwLockGuard`, transaction handles, or other scoped guards across `.await` unless the type and design explicitly support it.
 - Use Roze cache, MQ, singleflight, registry, and gateway primitives before inventing local concurrency systems.
-- Shared state inside `ServiceContext` must be `Send + Sync` when used by Axum/Tower/tonic services.
+- Shared state inside `ServiceContext` must be `Send + Sync` when used by Roze native HTTP/Tower/tonic services.
 
 Common pitfalls:
 
@@ -229,7 +229,8 @@ REST/API guidance:
 - Prefer generated route/handler/logic boundaries. Keep handlers thin and move business behavior into `src/logic/**`.
 - Use generated DTO validation and Roze response/error helpers before writing custom extractors or response envelopes.
 - Prefer built-in middleware for trace, recover, metrics, CORS, timeout, rate limit, breaker, max connections, shedding, gunzip, body limit, auth/JWT, and idempotency.
-- Add custom Tower/Axum layers only when the built-in config/middleware surface cannot express the behavior, and preserve Roze context and metrics.
+- Add custom Tower layers only when the built-in config/middleware surface cannot express the behavior, and preserve Roze context and metrics.
+- Do not expose Axum request, response, extractor, or router types from generated services; use Roze native HTTP APIs.
 - Avoid per-request client construction. Put HTTP clients, DB handles, registry clients, cache clients, MQ publishers, and search clients in `ServiceContext`.
 
 RPC and service-discovery guidance:

@@ -80,7 +80,7 @@ Generated Toasty repositories should support the stable Roze model contract wher
 - ent-style `{Model}Predicate`, `{Model}Order`, `{Model}Query`, `{Model}Create`, `{Model}Update`, `{Model}Delete`, and `{Model}Page` types
 - query builders with `where_`, `order`, `limit`, `offset`, `paginate`, `all`, `count`, `exists`, `first`, `only`, and `page`
 - predicate helpers for equality, IN, range, string contains/icontains, nullable fields, `IS NULL`, `and`, `or`, and `not`
-- projection helpers such as `ids`, `pluck_<field>`, and numeric `sum_<field>`
+- projection and aggregate helpers such as `ids`, `first_id`, `only_id`, `pluck_<field>`, `unique_<field>`, `count_by_<field>`, `first_<field>`, `only_<field>`, `sum_<field>`, `avg_<field>`, `min_<field>`, and `max_<field>`
 - create, update-one, delete-one, update-many, and delete-many builders
 - typed sorting
 - batch insert/delete
@@ -89,6 +89,8 @@ Generated Toasty repositories should support the stable Roze model contract wher
 - transaction-compatible executor arguments
 
 Generated SeaORM output should expose the same practical repository surface where possible.
+
+Projection helpers should apply predicates before projection. For nullable fields, preserve nullability in return types; for example, a nullable string field can produce `Vec<Option<String>>` for `pluck_<field>` and `Option<Option<String>>` for `first_<field>`.
 
 Service projects with `src/svc/mod.rs` can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
 
@@ -110,6 +112,8 @@ Important SQL type mappings:
 Mongo inspection samples collection documents for field and type inference, maps `_id` to `id`, preserves unique/index metadata, emits helpers for unique and compound indexes, and can generate an `ObjectId` id model for empty collections.
 
 SQL and inspect imports infer soft-delete columns from `deleted`, `is_deleted`, `deleted_at`, `delete_time`, or `deleted_at_millis`, and tenant columns from `tenant_id`, `org_id`, or `account_id`, then write those decisions into `schema.ent`. `.ent` schemas can declare them explicitly with `soft_delete <field>` and `tenant <field>`.
+
+Roze accepts many entgo-compatible schema forms as parse-compatible input and normalizes them into Roze `.ent`: builder-style `Table(...)`, `Schema(...)`, `CacheKey(...)`, `Tenant(...)`, `SoftDelete(...)`, field builders such as `String("email").Unique().NotEmpty()`, edge builders with `Field(...)` and `Ref(...)`, and index builders with `Fields(...)` and `Unique()`. Metadata-only directives and dialect-specific hints may be accepted but omitted from generated output; keep domain-specific behavior in `*_ext.rs`.
 
 When database decimal fields are exposed through public API/RPC contracts, keep public wire compatibility in DTO/logic mapping. Monetary public contracts often serialize as strings even when the generated repository model uses `rust_decimal::Decimal`.
 

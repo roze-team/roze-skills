@@ -1,6 +1,6 @@
 ---
 name: roze-skills
-description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze crates such as roze-http/roze-rpc/roze-service/roze-config/roze-mq/roze-search, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, service governance, middleware, model/search generation, ent-style query/create/update/delete/projection/sum builders, OpenAPI/SDK generation, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
+description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze native HTTP/roze-http, Roze crates such as roze-rpc/roze-service/roze-config/roze-mq/roze-search, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, service governance, middleware, model/search generation, ent-style query/create/update/delete/projection/aggregate builders, OpenAPI/SDK generation, generated ops assets, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
 ---
 
 # Roze Skills
@@ -22,9 +22,9 @@ Roze is IDL-first and convention-driven:
 
 Read only the files relevant to the current task:
 
-- [references/rozectl-workflows.md](references/rozectl-workflows.md): use for `rozectl` commands, API/RPC generation, update vs force, validate/format/diff, OpenAPI, SDK, mock, contract, quickstart/template/migrate, docker, kube, env/upgrade/completion, doctor, and dev stack workflows.
-- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, handler/server adapters, logic placement, service context, validation, context propagation, errors, middleware, health endpoints, lifecycle/bootstrap, and generated ownership.
-- [references/data-search-patterns.md](references/data-search-patterns.md): use for `.ent` model generation, Toasty, SeaORM, SQL/Mongo inspection, ent-style repository/client/query/mutation/projection/sum builders, decimal/smallint mappings, search DSL/inspection, and Elasticsearch/OpenSearch/Meilisearch support.
+- [references/rozectl-workflows.md](references/rozectl-workflows.md): use for `rozectl` commands, API/RPC generation, update vs force, validate/format/diff, OpenAPI, SDK, mock, contract, quickstart/template/migrate, docker, kube, env/upgrade/completion, doctor, generated ops assets, and dev stack workflows.
+- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, Roze native HTTP handlers/router/extractors/responses, server adapters, logic placement, service context, validation, context propagation, errors, middleware, health endpoints, lifecycle/bootstrap, and generated ownership.
+- [references/data-search-patterns.md](references/data-search-patterns.md): use for `.ent` model generation, Toasty, SeaORM, SQL/Mongo inspection, ent-style repository/client/query/mutation/projection/aggregate builders, decimal/smallint mappings, search DSL/inspection, and Elasticsearch/OpenSearch/Meilisearch support.
 - [references/governance-operations.md](references/governance-operations.md): use for config, registry, gateway, MQ, DTM, cache, lifecycle, metrics, tracing, release gates, production evidence, smoke/soak scripts, and hot-path expectations.
 - [references/rust-engineering.md](references/rust-engineering.md): use for Rust ownership/lifetime, error handling, async/concurrency, resource lifecycle, dependencies, performance, unsafe/FFI, refactoring, and code-review patterns that apply inside Roze crates or generated services.
 - [references/troubleshooting.md](references/troubleshooting.md): use when diagnosing generator issues, mixed API/RPC contracts, regeneration overwrites, validator mappings, config failures, dependency stack problems, or tests to run.
@@ -44,7 +44,7 @@ Read only the files relevant to the current task:
 ## Roze Principles
 
 - IDL first: `.api` and `.proto` are the source of boundary contracts.
-- Rust native: generated services use Axum/Tower for REST, tonic/prost for RPC, and Roze crates for framework behavior.
+- Rust native: generated services use Roze native HTTP/Tower for REST, tonic/prost for RPC, and Roze crates for framework behavior.
 - Generated boundaries stay explicit: route registration, handlers, RPC adapters, protobuf include modules, DTOs, OpenAPI, and deployment files are generator-owned.
 - Application logic stays explicit: complex SQL, transactions, authorization, permission checks, domain validation, search ranking, and business orchestration are not invented by the generator.
 - Framework behavior should come from Roze first: prefer built-in middleware, `roze_context`, `roze_result`, `roze_error`, `roze_health`, `roze_config`, `roze_rpc`, `roze_gateway`, `roze_mq`, `roze_cache`, `roze_local_cache`, `roze_singleflight`, `roze_search`, and generated repositories before adding local equivalents.
@@ -77,5 +77,6 @@ rozectl openapi generate example/user.api --out docs/openapi.json
 - Do not hand-edit generated files when a template or generator test should change instead.
 - Do not mix REST routes and RPC methods in one generation path; use the appropriate `api` or `rpc` command.
 - Do not construct ad hoc HTTP error JSON or gRPC status metadata outside Roze error helpers.
+- Do not expose Axum types from generated services or framework crates; use `roze_http` request, response, router, extractor, middleware, and body APIs.
 - Do not replace built-in Roze middleware, context, config, health, registry, cache, MQ, DTM, metrics, tracing, or search/model helpers with local implementations unless the active checkout lacks the needed capability and the gap is documented.
 - Do not add public behavior without updating docs and tests.

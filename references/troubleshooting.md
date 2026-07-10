@@ -40,6 +40,10 @@ Symptom: request timeouts behave differently than expected.
 
 Check `rest.middlewares.timeout` and route governance overrides. `timeout: true` lets generated route glue enforce service-wide `governance.timeout_ms` and route-specific timeout overrides. `timeout: false` can still propagate timeout metadata without cancelling logic in the HTTP adapter.
 
+Symptom: generated REST code imports Axum types.
+
+Check whether the service was generated from an older Roze checkout. Current generated REST code should use Roze native HTTP APIs such as `roze_http::Router`, extractors, responses, body helpers, and Tower-compatible middleware. Regenerate with the current `rozectl` and keep any custom HTTP behavior in application-owned logic or middleware.
+
 ## Validation Issues
 
 Symptom: validator tags do not map to derives.
@@ -100,6 +104,22 @@ Check generated `Cargo.toml`: Toasty services need `rust_decimal` and Toasty's `
 Symptom: custom string contains filters behave differently across Toasty/SeaORM.
 
 Generated ent-style predicates include `contains`/`icontains` helpers and escape LIKE patterns. For advanced search semantics, keep custom query orchestration in `src/model/*_ext.rs` or application modules until the active Roze checkout documents a richer stable predicate API.
+
+Symptom: ent-style projection helper is missing after regeneration.
+
+Confirm the active checkout includes the projection helper and that the field type supports it. Current query builders can emit `pluck_<field>`, `unique_<field>`, `count_by_<field>`, `first_<field>`, `only_<field>`, numeric `sum_<field>`, `avg_<field>`, `min_<field>`, and `max_<field>` where supported.
+
+## Generated Ops Verification Issues
+
+Symptom: generated service release checks fail because ops files are missing or stale.
+
+Run the generated verifier from the service root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ops\production-verify.ps1
+```
+
+Regenerate with `--update` from the current `rozectl` if generated production assets such as governance baseline, SLO, failure-injection, rollout, security, runtime-hardening, or interface-governance files are missing.
 
 ## Test Selection
 

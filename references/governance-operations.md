@@ -80,6 +80,7 @@ cargo test -p roze-config
 cargo test -p roze-mq
 cargo test -p roze-gateway
 cargo test -p roze-service -p roze-bootstrap -p roze-shutdown
+cargo test -p roze-job
 ```
 
 Project-level smoke scripts:
@@ -89,11 +90,12 @@ bash scripts/production-smoke.sh
 bash scripts/production-smoke.sh --with-compose
 bash scripts/rozectl-smoke.sh
 bash scripts/release-gate.sh
+bash scripts/production-evidence-smoke.sh
 ```
 
 `--with-compose` starts integration dependencies such as etcd, consul, Kafka, NATS, Redis, Postgres, MySQL, MongoDB, Elasticsearch, OpenSearch, and Meilisearch.
 
-`scripts/release-gate.sh` is the high-signal local gate for formatting, clippy, Gateway, Config Center, MQ, lifecycle/bootstrap, `rozectl` smoke, generated compile smoke, and production smoke without external Compose dependencies.
+`scripts/release-gate.sh` is the high-signal local gate for formatting, clippy, Gateway, Config Center, MQ, lifecycle/bootstrap, `roze-job`, `rozectl` smoke, generated compile smoke, production evidence smoke, and production smoke without external Compose dependencies.
 
 For external dependency verification:
 
@@ -129,6 +131,20 @@ bash scripts/production-soak-lifecycle.sh 300
 Evidence reports should record the Roze Git revision, Rust toolchain, OS, command, dependency topology, workload, duration, success criteria, error budget, latency/throughput/resource trends, restart count, leak checks, failure injection timeline, and final verdict.
 
 Keep report verdicts conservative: use `inconclusive` until measurements and artifacts are filled in. Do not fabricate 24h/72h results or call beta/scaffold modules stable based only on short-run smoke checks.
+
+Lifecycle evidence can include a validated summary line:
+
+```bash
+bash scripts/production-evidence.sh \
+  --area lifecycle \
+  --duration 24h \
+  --workload "start, drain, shutdown, failed task, timeout hooks" \
+  --failure-injection "stuck task, signal shutdown, hook timeout" \
+  --command "bash scripts/production-soak-lifecycle.sh" \
+  --lifecycle-summary "roze_lifecycle_soak cycles=2 worker_exits=8 stop_hooks=8 running_snapshots=2 stopped_snapshots=2 max_service_count=4"
+```
+
+`scripts/production-evidence-smoke.sh` verifies report scaffold generation and rejects lifecycle summaries with missing fields, non-numeric fields, non-lifecycle usage, or inconsistent counts.
 
 ## Documentation Sync
 
