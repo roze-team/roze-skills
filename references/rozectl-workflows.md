@@ -100,9 +100,10 @@ Check API contract compatibility:
 
 ```bash
 rozectl contract check --old example/user.v1.api --new example/user.v2.api
+rozectl contract diff --old example/user.v1.api --new example/user.v2.api --out contract-diff.md
 ```
 
-Treat removed routes, removed RPC methods, changed request/response types, removed fields, field source/type changes, and newly required fields as breaking unless the command documents otherwise.
+Treat removed routes, removed RPC methods, changed request/response types, removed fields, field source/type changes, and newly required fields as breaking unless the command documents otherwise. Use `contract diff` when reviewers need one semantic report across REST, RPC, OpenAPI, and TypeScript SDK surface changes; it writes the report before failing so CI can retain the artifact.
 
 Inspect and maintain local or remote starter templates through built-in commands:
 
@@ -129,6 +130,8 @@ Generate HTTP contract tests:
 rozectl test gen --api example/user.api --out contract-tests
 ```
 
+Generated contract tests cover API routes and framework-owned endpoints such as `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/openapi.json`, `/reports/export`, and `/charts/query`. Use `ROZE_E2E_SERVICES=name=http://host:port,...` to run the generated readiness flow against several services from one test command.
+
 Generate OpenAPI:
 
 ```bash
@@ -152,6 +155,14 @@ Generate Markdown API docs:
 rozectl api doc --api example/user.api --dir . --out docs/api
 rozectl doc service --api example/user.api --out SERVICE.md
 ```
+
+Run a custom API plugin after parsing the `.api` once:
+
+```bash
+rozectl api plugin --plugin ./tools/api-plugin.sh --api example/user.api --dir generated
+```
+
+Plugins receive normalized API JSON through stdin and `ROZECTL_API_SPEC_JSON`; `ROZECTL_API_FILE` and `ROZECTL_OUT_DIR` identify the input and output directories. Plugin outputs are plugin-owned files under the requested directory.
 
 ## Local Environment Commands
 

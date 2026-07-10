@@ -56,11 +56,19 @@ Use `roze-local-cache` for in-process Moka-backed cache with TTL, capacity evict
 
 Use `roze-cache` and Redis helpers for distributed cache. Cache-aside loading should use `roze-singleflight` to avoid hot-key miss stampedes.
 
-Prefer Roze cache abstractions, singleflight, outbox, MQ publisher/consumer, and DTM helpers before adding local concurrency, retry, dead-letter, or transaction orchestration.
+Prefer Roze cache abstractions, singleflight, outbox, object storage, MQ publisher/consumer, DTM helpers, and `roze-query` read-model composition before adding local concurrency, retry, dead-letter, transaction orchestration, media URL, or fan-out query code.
 
 High-frequency in-memory lookup/index paths use concurrent maps/sets where the framework already chose them, including metrics, singleflight, registry, session, WebSocket, eventbus, and MQ stores.
 
 Reliable event publishing should prefer outbox relay and publish through a `roze_mq::Publisher`.
+
+Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. Production services should inject a persistent adapter with `with_outbox_store`; database adapters should implement `TransactionalOutbox<Tx>` so business writes and outbox messages commit atomically before `relay_outbox_batch` publishes claimed messages and records retry state.
+
+Generated object-storage integration should keep application logic working with object keys and `FileMetadata`. Use `ServiceContext::media_url` / `resolve_media_url` instead of constructing provider URLs by hand; `issue_upload_token` should return normalized keys, expiration, upload policy, and provider presigned requests.
+
+Generated model repositories use versioned cache keys via `roze_cache::model_cache_key`, and create/update/delete/soft-delete paths should invalidate every configured lookup key after a successful database write. Use `InvalidationPlan` for writes outside generated repositories. For bounded-staleness read models, use `get_or_load_consistent_option` with `CacheConsistencyPolicy` so stale-on-error cannot outlive the hard TTL window.
+
+Use `roze-query::QueryComposer` for read-model fan-out. Configure total request budget, per-upstream timeout, max fan-out, concurrency, and strict vs partial failure behavior instead of hand-rolling joins across downstream calls.
 
 MQ consumers must make ack/nack, retry, dead letter, and idempotency behavior explicit.
 

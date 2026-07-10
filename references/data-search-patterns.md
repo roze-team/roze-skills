@@ -92,6 +92,12 @@ Generated SeaORM output should expose the same practical repository surface wher
 
 Projection helpers should apply predicates before projection. For nullable fields, preserve nullability in return types; for example, a nullable string field can produce `Vec<Option<String>>` for `pluck_<field>` and `Option<Option<String>>` for `first_<field>`.
 
+## Fixtures And Seeds
+
+Generated SeaORM, Toasty, and Mongo models expose deterministic fixture builders such as `Model::fixture(index)`. Fixtures should be repeatable for the same index, distinct across common scalar values, choose the first declared enum value, and populate `Option` and collection fields.
+
+Generated repositories expose `seed_fixtures(count)` to insert repeatable data through the normal write path, including cache invalidation where applicable. Put application-specific relationships, cleanup, and assertions in preserved `<model>_ext.rs` files rather than editing generated fixture code.
+
 Service projects with `src/svc/mod.rs` can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
 
 Handwritten extensions belong in application-owned files such as `src/model/<model>_ext.rs`. Do not place business-specific query orchestration in generator-owned files.
