@@ -1,6 +1,6 @@
 ---
 name: roze-skills
-description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze native HTTP/roze-http, Roze crates such as roze-rpc/roze-service/roze-config/roze-mq/roze-search/roze-query, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, service governance, permission/idempotency middleware, persistent outbox, cache consistency, object storage, model/search generation, ent-style query/create/update/delete/projection/aggregate builders, OpenAPI/SDK generation, contract diff, API plugins, generated ops assets, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
+description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze native HTTP/roze-http, Roze crates such as roze-rpc/roze-service/roze-config/roze-gateway/roze-mq/roze-search/roze-query, managed upstream RPC clients, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, service governance, gateway native HTTP policy, permission/idempotency middleware, persistent outbox, cache consistency, object storage, model/search generation, ent-style query/create/update/delete/projection/aggregate builders, OpenAPI/SDK generation, contract diff, API plugins, generated ops assets, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
 ---
 
 # Roze Skills
@@ -13,7 +13,7 @@ Roze is IDL-first and convention-driven:
 
 - Define REST routes, RPC methods, DTOs, and annotations in `.api` or `.proto` contracts.
 - Use `rozectl` to generate framework-owned boundaries.
-- Prefer Roze built-in generators, crates, middleware, config, governance, context, error, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers before introducing custom infrastructure.
+- Prefer Roze built-in generators, crates, middleware, config, governance, context, error, health, metrics, tracing, registry, gateway, cache, MQ, DTM, RPC-client, and search/model helpers before introducing custom infrastructure.
 - Put business behavior in generated extension points, especially `src/logic/**`, custom middleware, and application-owned modules.
 - Preserve generated ownership boundaries during regeneration.
 - Validate changes with targeted crate tests and smoke scripts.
@@ -23,7 +23,7 @@ Roze is IDL-first and convention-driven:
 Read only the files relevant to the current task:
 
 - [references/rozectl-workflows.md](references/rozectl-workflows.md): use for `rozectl` commands, API/RPC generation, update vs force, validate/format/diff, OpenAPI, SDK, mock, contract check/diff, API plugins, quickstart/template/migrate, docker, kube, env/upgrade/completion, doctor, generated ops assets, and dev stack workflows.
-- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, Roze native HTTP handlers/router/extractors/responses, server adapters, logic placement, service context, validation, context propagation, permissions, idempotency, errors, middleware, health endpoints, lifecycle/bootstrap, and generated ownership.
+- [references/service-patterns.md](references/service-patterns.md): use for generated REST/RPC/stream layouts, Roze native HTTP handlers/router/extractors/responses, server adapters, managed upstream RPC clients, logic placement, service context, validation, context propagation, permissions, idempotency, errors, middleware, health endpoints, lifecycle/bootstrap, and generated ownership.
 - [references/data-search-patterns.md](references/data-search-patterns.md): use for `.ent` model generation, Toasty, SeaORM, SQL/Mongo inspection, deterministic model fixtures/seeds, ent-style repository/client/query/mutation/projection/aggregate builders, decimal/smallint mappings, search DSL/inspection, and Elasticsearch/OpenSearch/Meilisearch support.
 - [references/governance-operations.md](references/governance-operations.md): use for config, registry, gateway, MQ, DTM, persistent outbox, cache consistency, object storage, read-model composition, lifecycle, metrics, tracing, release gates, production evidence, smoke/soak scripts, and hot-path expectations.
 - [references/rust-engineering.md](references/rust-engineering.md): use for Rust ownership/lifetime, error handling, async/concurrency, resource lifecycle, dependencies, performance, unsafe/FFI, refactoring, and code-review patterns that apply inside Roze crates or generated services.
@@ -47,7 +47,7 @@ Read only the files relevant to the current task:
 - Rust native: generated services use Roze native HTTP/Tower for REST, tonic/prost for RPC, and Roze crates for framework behavior.
 - Generated boundaries stay explicit: route registration, handlers, RPC adapters, protobuf include modules, DTOs, OpenAPI, and deployment files are generator-owned.
 - Application logic stays explicit: complex SQL, transactions, authorization, permission checks, domain validation, search ranking, and business orchestration are not invented by the generator.
-- Framework behavior should come from Roze first: prefer built-in middleware, `roze_context`, `roze_result`, `roze_error`, `roze_health`, `roze_config`, `roze_rpc`, `roze_gateway`, `roze_mq`, `roze_cache`, `roze_local_cache`, `roze_singleflight`, `roze_query`, `roze_storage`, `roze_transaction`, `roze_search`, and generated repositories before adding local equivalents.
+- Framework behavior should come from Roze first: prefer built-in middleware, `roze_context`, `roze_result`, `roze_error`, `roze_health`, `roze_config`, `roze_rpc`, `roze_gateway`, `roze_http`, `roze_mq`, `roze_cache`, `roze_local_cache`, `roze_singleflight`, `roze_query`, `roze_storage`, `roze_transaction`, `roze_search`, generated RPC clients, and generated repositories before adding local equivalents.
 - Generated service entrypoints should use Roze lifecycle/bootstrap primitives where available, especially `roze_service::ServiceGroup`, health/readiness state, graceful shutdown, and generated readiness/draining behavior.
 - Context, errors, logs, metrics, config, registry, and middleware behavior should be uniform across REST, RPC, gateway, MQ, and jobs.
 

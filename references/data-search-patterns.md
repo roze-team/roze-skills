@@ -100,6 +100,8 @@ Generated repositories expose `seed_fixtures(count)` to insert repeatable data t
 
 Service projects with `src/svc/mod.rs` can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
 
+For Toasty services, rozectl keeps the `toasty::models!(...)` registry in `src/svc/mod.rs` synchronized with the generated model set, for example `toasty::models!(crate::model::User, crate::model::AdminToken)`. Treat that registry, the optional Toasty database field, the `toasty` readiness check, and `ServiceContext::model()` as generated service-context wiring. Put custom repository behavior in `<model>_ext.rs` or application modules instead of hand-editing the registry.
+
 Handwritten extensions belong in application-owned files such as `src/model/<model>_ext.rs`. Do not place business-specific query orchestration in generator-owned files.
 
 ## SQL And Mongo Input Notes

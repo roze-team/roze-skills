@@ -46,13 +46,17 @@ cargo run -p rozectl -- api generate example/user.api --out apps/roze-example --
 
 Use `--update` for normal regeneration. It preserves:
 
-- REST `src/logic/**.rs`
-- RPC `src/logic/*.rs`
-- custom declarations in RPC `src/logic/mod.rs`
-- stream `src/stream/consumer.rs`
-- REST custom `src/middleware/*.rs`
+- REST `src/logic/<group>/<method>.rs`
+- REST `src/config/mod.rs`
+- REST `src/handler/<group>/<method>.rs`
+- REST/RPC `src/svc/mod.rs`
+- REST custom middleware files under `src/middleware/<name>.rs`
+- RPC `src/config/mod.rs`
+- RPC `src/logic/<method>.rs`
 - `config.yaml`
 - model extension files `src/model/*_ext.rs`
+
+Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, and `proto/service.proto` is refreshed. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. RPC `--update` also preserves existing generated model composition, including `mod model;`, `ServiceContext::model()`, and Toasty registry wiring when the service already has generated models.
 
 Use `--force` only for a deliberate full rebuild.
 

@@ -50,6 +50,20 @@ Route-level governance has higher priority than service-level and global config.
 
 Retries should count only real retry attempts, not the final failed attempt.
 
+## Gateway Native HTTP Governance
+
+The native HTTP gateway compiles route policy into an immutable runtime snapshot. Precedence is explicit route fields, then `governance.routes`, then global governance, then gateway defaults. Ordinary HTTP requests enforce method constraints, request-size limits, rate limits, shared breaker state, bounded adaptive shedding, timeout, fallback, and gateway metrics.
+
+Gateway retries are limited to idempotent HTTP methods: `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, and `TRACE`. Network failures and 500/502/503/504 responses use Roze's exponential full-jitter backoff, `max_backoff_ms`, route/service retry budgets, and the inbound deadline. Do not schedule a retry if its backoff would consume the remaining deadline. Count `attempt` only for calls that actually reach an upstream, and settle the breaker once for the final logical result.
+
+Registry-backed gateway routes should rediscover before every upstream attempt. Merge service and route instance tags with route tags taking precedence; tag mismatches fail closed. Weighted selection uses bounded cursor selection rather than expanding candidates by weight. Connection errors, timeouts, and 5xx responses feed passive outlier ejection, so retries pick again from the remaining healthy set. Active probes use separate healthy/unhealthy thresholds and should end when the gateway runtime is dropped.
+
+Native CORS runs before route matching and before the governance chain. Preflight checks validate origin, method, and headers without consuming rate-limit, breaker, shedding, or upstream capacity; accepted and rejected preflights still produce metrics. Ordinary responses should emit allow-origin only for configured origins.
+
+SSE and WebSocket forwarding must stream without buffering full upstream bodies. The route timeout covers request and response headers; after an SSE or WebSocket stream is established, use `stream_idle_timeout_ms` and `max_stream_connections` with route, service, then gateway precedence. WebSocket upgrades still pass through auth, rate limit, breaker, shedding, registry/tag/health/outlier decisions, validate RFC 6455 version/key and `Sec-WebSocket-Accept`, and reject unrequested subprotocols. `wss`/`https` upstreams use strict TLS validation; plaintext fallback is forbidden.
+
+Config-center reloads build a complete new runtime before atomic replacement. New requests use the new snapshot, in-flight HTTP/SSE/WebSocket work keeps its old snapshot, and rate limits, breaker state, retry budgets, outlier/health state, stream capacity, registry cursors, HTTP client, and TLS state survive replacement. Changes outside `gateway`, `auth`, `governance`, or `registry` should be skipped. Parse errors, invalid policy, registry construction failures, gateway-section removal, and listen-address changes retain the last valid runtime and record structured reload outcomes.
+
 ## Data, Cache, Events, And DTM
 
 Use `roze-local-cache` for in-process Moka-backed cache with TTL, capacity eviction, time-to-idle, and hit/miss statistics.
