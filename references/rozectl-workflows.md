@@ -109,6 +109,14 @@ rozectl contract diff --old example/user.v1.api --new example/user.v2.api --out 
 
 Treat removed routes, removed RPC methods, changed request/response types, removed fields, field source/type changes, and newly required fields as breaking unless the command documents otherwise. Use `contract diff` when reviewers need one semantic report across REST, RPC, OpenAPI, and TypeScript SDK surface changes; it writes the report before failing so CI can retain the artifact.
 
+Run the release-facing semantic gate across API/OpenAPI, search, and SQL schema contracts:
+
+```bash
+rozectl gate check --manifest roze-gate.yaml --report target/roze-gate.json --markdown target/roze-gate.md
+```
+
+Gate manifests use version `1`, declare `domain: api|search|sql`, and can require checked-in acknowledgement records bound to exact SHA-256 digests for blocking changes. Exit code `0` passes, `1` means an unacknowledged blocking change, and `2` means invalid manifest, acknowledgement, or input.
+
 Inspect and maintain local or remote starter templates through built-in commands:
 
 ```bash
@@ -147,11 +155,9 @@ Generate clients:
 ```bash
 rozectl api client ts example/user.api --out sdk/user.ts
 rozectl api client js example/user.api --out sdk/user.js
-rozectl api client dart example/user.api --out sdk/user.dart
-rozectl api client java example/user.api --out sdk/RozeApiClient.java
-rozectl api client kotlin example/user.api --out sdk/RozeApiClient.kt
-rozectl api client swift example/user.api --out sdk/RozeApiClient.swift
 ```
+
+Roze currently scopes SDK generation to TypeScript and JavaScript Web clients. Do not document or invoke Dart, Java, Kotlin, Swift, iOS, or Android SDK generation unless the active checkout reintroduces those targets.
 
 Generate Markdown API docs:
 
@@ -167,6 +173,8 @@ rozectl api plugin --plugin ./tools/api-plugin.sh --api example/user.api --dir g
 ```
 
 Plugins receive normalized API JSON through stdin and `ROZECTL_API_SPEC_JSON`; `ROZECTL_API_FILE` and `ROZECTL_OUT_DIR` identify the input and output directories. Plugin outputs are plugin-owned files under the requested directory.
+
+For Rust-side generator extensions, `rozectl` is also a library. Use the versioned extension APIs (`GENERATOR_EXTENSION_API_VERSION` and `MODEL_GENERATOR_EXTENSION_API_VERSION`, currently `1`) instead of depending on private formatting helpers. Command extensions register on `GeneratorRegistry` and run before/after built-in generation; model extensions transform a `ModelGenerationGraph` and may emit generated or application-owned model extension files. Extension outputs must stay in their own unmarked files or documented application-owned extension points; absolute paths, parent traversal, and replacing core model artifacts are rejected.
 
 ## Local Environment Commands
 
@@ -197,7 +205,7 @@ rozectl docker --binary user-api --port 8080
 rozectl kube deploy --name user-api --image registry.example.com/user-api:latest --port 8080
 ```
 
-Keep generated deployment files aligned with public docs and smoke scripts whenever command flags or defaults change.
+Keep generated deployment files aligned with public docs and smoke scripts whenever command flags or defaults change. Generated Kubernetes/Helm assets expose immutable image digests, Secret/ConfigMap references, Prometheus scrape settings, TLS secret mounts, private registry `image.pullSecrets`, Pod security context defaults, and offline validation. Use `rozectl helm validate` where available to catch malformed values before Helm rendering.
 
 ## Generator Smoke Checks
 
@@ -222,3 +230,5 @@ cargo test -p rozectl generated_rest_project_compiles_with_model_and_search -- -
 cargo test -p rozectl generated_rpc_project_compiles -- --ignored
 cargo test -p rozectl generated_stream_project_compiles -- --ignored
 ```
+
+Before a release, run `bash scripts/release-gate.sh` on Linux or WSL. On Windows, `powershell -ExecutionPolicy Bypass -File scripts/release-preflight.ps1` is useful but non-authoritative because it omits Unix-only rdkafka-enabled targets. Runtime-critical maturity changes also require `bash scripts/production-evidence-gate.sh`; model parity work should include `bash scripts/model-parity-gate.sh` when the active checkout provides it.

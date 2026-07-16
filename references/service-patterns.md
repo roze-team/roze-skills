@@ -55,6 +55,8 @@ Generated REST services expose:
 
 The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register dependency checks there when startup-created clients need readiness reporting.
 
+`HealthRegistry` executes registered dependency checks concurrently while preserving report order. Checks have a default timeout and panics are isolated into unhealthy probe results; use `HealthRegistry::with_check_timeout(Duration)` when a service needs a stricter budget.
+
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
 
 `/reports/export` and `/charts/query` are framework-owned production interface scaffolds. Replace their default accepted/empty responses in application-owned logic with the real report catalog, BI query, async export, object-store download, authorization, and audit behavior.
@@ -94,6 +96,8 @@ Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry
 `rozectl rpc protoc --update` should preserve custom module declarations in `src/logic/mod.rs` as well as application-owned files under `src/logic/**`.
 
 Generated RPC entrypoints should use the same `roze_service::ServiceGroup` lifecycle behavior as REST services when available. Avoid creating separate shutdown channels or ad hoc readiness flags unless the active checkout lacks lifecycle support.
+
+Generated RPC servers register the standard `grpc.health.v1.Health` service. The overall server and generated protobuf service report `NOT_SERVING` during startup, dependency failure, and draining, and `SERVING` when the shared `HealthRegistry` is ready. The generated `grpc-health-sync` lifecycle task refreshes status and publishes `NOT_SERVING` before shutdown.
 
 `roze-config::ServiceConfig` supports a default `rpc_client` and named `rpc_clients.<name>` entries. Use `ServiceConfig::rpc_client_config(name)` or `rpc_client_config_ref(name)` when generated services call multiple upstream RPC services. Each client config must choose exactly one connection mode: `target`, `endpoints`, or `etcd`.
 
@@ -184,6 +188,8 @@ Built-in names include `auth`, `jwt`, `trace`, `recover`, `stat`, `prometheus`, 
 Prefer built-in middleware names in `.api` annotations and `config.yaml` before generating custom middleware files. Custom middleware should focus on product-specific behavior and should still preserve Roze request context, tracing spans, metrics labels, error shape, and timeout/cancellation behavior.
 
 Business logic should log with `tracing` macros directly. Do not pass or construct trace ids manually; Roze middleware carries trace ids in the request span.
+
+Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for configuration readiness, dependency setup, registry or subscription readiness, shutdown, stop, and failure. Native HTTP logs request start/completion; RPC governance logs method start/completion/cancellation. Safe `RUST_LOG=debug` framework logs may include route matches, middleware plans, retry decisions, stream ack/nack, model query kinds, and ServiceGroup phase changes, but must not include request/message bodies, auth values, SQL arguments, fallback payloads, or dependency error messages.
 
 ## Service Context And Lifecycle
 

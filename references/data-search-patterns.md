@@ -92,6 +92,22 @@ Generated SeaORM output should expose the same practical repository surface wher
 
 Projection helpers should apply predicates before projection. For nullable fields, preserve nullability in return types; for example, a nullable string field can produce `Vec<Option<String>>` for `pluck_<field>` and `Option<Option<String>>` for `first_<field>`.
 
+Roze tracks practical ent parity by generated API, runtime semantics, regeneration behavior, and backend evidence. Prefer the wording "ent-style generated model API" unless the active checkout's parity matrix and `scripts/model-parity-gate.sh` support stronger claims. In-scope parity includes fields/indexes/defaults, custom/composite IDs, ordinary/inverse/Through edges, predicates, `HasX`/`HasXWith`, ordering/pagination/projection/aggregation, create/update/delete, eager loading, hooks/interceptors, privacy/policy, mixins, migrations, and generator extensions.
+
+## Model Operation Chain
+
+`roze-orm` defines one ordered around-chain contract for mutation hooks, query interceptors, and traversal interceptors. The first registered middleware is outermost. Generated SeaORM and Toasty create/update/delete builders expose `hook(...)`; query builders expose asynchronous `around(...)`; older synchronous `intercept(...)` remains for predicate/order rewriting.
+
+Privacy rules implement ordered allow/deny/skip policy evaluation. Generated query and mutation builders expose `policy(rules, deny_by_default)` and deny by default when every rule skips. Builders also expose `mixin(value)` through `OperationMixin<Self>` so application mixins can transform multiple generated builder types. Reusable provider registrations such as `ModelClient::use_<entity>_mutation_hooks` belong in preserved `src/model/*_ext.rs` files, not generated repository files.
+
+Generated edge traversal methods such as `traverse_<edge>` return typed target queries before terminal execution, so callers can attach `around(...)` traversal middleware. Nullable owning edges return `Option<TargetQuery>` to distinguish absent foreign keys from intercepted empty results.
+
+## Model Migrations
+
+`roze-migration` provides drift-checked migration planning and transactional execution for SQLite, PostgreSQL, and MySQL. Migrations have stable numeric versions, names, forward SQL, and optional reverse SQL.
+
+Use `plan_apply` or backend-specific planning/status helpers for dry-run evidence before changing a database. Planning rejects duplicate versions, unknown applied versions, and version/name drift. Rollback planning emits reverse-ordered steps down to the requested applied version boundary and rejects missing reverse SQL before execution begins. Apply and rollback execution run SQL statements and ledger updates in one database transaction. Production migrations should include reverse SQL unless an explicit irreversible-release policy is documented.
+
 ## Fixtures And Seeds
 
 Generated SeaORM, Toasty, and Mongo models expose deterministic fixture builders such as `Model::fixture(index)`. Fixtures should be repeatable for the same index, distinct across common scalar values, choose the first declared enum value, and populate `Option` and collection fields.

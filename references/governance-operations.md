@@ -50,6 +50,12 @@ Route-level governance has higher priority than service-level and global config.
 
 Retries should count only real retry attempts, not the final failed attempt.
 
+`roze_config::GovernanceConfig` is the source of truth for shared policy. At protocol boundaries, resolve one authoritative `GovernancePolicy` with `resolve_policy(key)` or `resolve_policy_for(keys)` instead of merging global and scoped fields independently. Scoped fields override only when present, omitted fields inherit global values, and disabled fallback entries do not silently inherit as enabled.
+
+REST applies timeout, rate limit, breaker, shedding, and fallback. RPC applies timeout, retry budget, rate limit, breaker, shedding, and fallback. MQ `spawn_consumer_with_governance` and job helpers such as `add_governed`, `spawn_with_governance`, and `spawn_once_with_governance` apply timeout, bounded full-jitter retry, retry budget, rate limit, breaker, and shedding before ack/nack or job completion settlement. Fallback is response-oriented; MQ and Job must not reinterpret fallback as ack, success, or suppressed failure.
+
+All governed boundaries should emit `roze_resilience_decisions_total` with bounded `boundary` values such as `rest`, `rpc`, `gateway`, `mq`, or `job`. Keep policy state local to the data path so control-plane availability is not required for each request, message, or job execution.
+
 ## Gateway Native HTTP Governance
 
 The native HTTP gateway compiles route policy into an immutable runtime snapshot. Precedence is explicit route fields, then `governance.routes`, then global governance, then gateway defaults. Ordinary HTTP requests enforce method constraints, request-size limits, rate limits, shared breaker state, bounded adaptive shedding, timeout, fallback, and gateway metrics.
@@ -145,6 +151,7 @@ bash scripts/production-evidence.sh \
 Short soak entrypoints validate the harness. Increase duration and workload before using them as evidence:
 
 ```bash
+bash scripts/production-soak-gateway.sh
 bash scripts/production-soak-mq.sh 300
 bash scripts/production-soak-config-center.sh 300
 bash scripts/production-soak-lifecycle.sh 300
@@ -167,6 +174,8 @@ bash scripts/production-evidence.sh \
 ```
 
 `scripts/production-evidence-smoke.sh` verifies report scaffold generation and rejects lifecycle summaries with missing fields, non-numeric fields, non-lifecycle usage, or inconsistent counts.
+
+`scripts/production-evidence-gate.sh` prevents runtime-critical maturity entries from moving to `stable` without complete passing 24h/72h evidence. Supply-chain gates should run RustSec advisory, dependency license, and registry/source policy checks against `Cargo.lock`, `audit.toml`, and `deny.toml`; exceptions must be narrow, owned, dated, and removable.
 
 ## Documentation Sync
 
