@@ -12,7 +12,7 @@ rozectl upgrade --dry-run
 rozectl completion powershell
 ```
 
-Use `cargo install --git https://github.com/roze-team/roze.git rozectl --force` or `cargo install --path apps/rozectl --force` when the active checkout requires a newer binary. Roze is pre-release; prefer a pinned Git revision for controlled production paths.
+Use `cargo install --git https://github.com/roze-team/roze.git rozectl --force` or `cargo install --path apps/rozectl --force` when the active checkout requires a newer binary. Roze 1.x is the stable public channel for CLI commands and generated contracts; for production adoption, prefer a pinned Git revision or signed tag and still review the maturity/evidence state for the runtime areas you depend on.
 
 Generate REST from `.api` route declarations:
 
@@ -59,6 +59,21 @@ Use `--update` for normal regeneration. It preserves:
 Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, and `proto/service.proto` is refreshed. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. RPC `--update` also preserves existing generated model composition, including `mod model;`, `ServiceContext::model()`, and Toasty registry wiring when the service already has generated models.
 
 Use `--force` only for a deliberate full rebuild.
+
+## Service Dependencies
+
+Generated API and RPC services should manage cross-service RPC dependencies through `roze-service.yaml` instead of hand-editing generated client fields or accessors. Add or import a dependency with:
+
+```bash
+rozectl service dependency add order --project services/payment --crate shop-order-rpc --path ../shop-order-rpc --endpoint 127.0.0.1:4002
+rozectl service dependency list --project services/payment
+rozectl service dependency remove order --project services/payment
+rozectl service sync --project services/payment --check
+```
+
+`dependency add` validates the upstream RPC crate/contract, writes the manifest, and synchronizes the `*-rpc` Cargo path dependency, non-secret defaults in `config/roze-dependencies.yaml`, managed client startup/readiness/accessor sections in `src/svc/mod.rs`, and the generated project kind (`api` or `rpc`). `service sync --check` writes nothing and fails on drift; run it in release pipelines for every service with `roze-service.yaml`.
+
+`config/roze-dependencies.yaml` is loaded before `config.yaml`; deployment config and `ROZE__...` environment variables override generated dependency defaults. Do not put secrets, tokens, passwords, or certificates in `roze-service.yaml`.
 
 Create starter projects through the same generator path:
 

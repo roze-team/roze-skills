@@ -59,7 +59,7 @@ The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register de
 
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
 
-`/reports/export` and `/charts/query` are framework-owned production interface scaffolds. Replace their default accepted/empty responses in application-owned logic with the real report catalog, BI query, async export, object-store download, authorization, and audit behavior.
+`/reports/export` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols.
 
 ## RPC Layout
 
@@ -101,9 +101,11 @@ Generated RPC servers register the standard `grpc.health.v1.Health` service. The
 
 `roze-config::ServiceConfig` supports a default `rpc_client` and named `rpc_clients.<name>` entries. Use `ServiceConfig::rpc_client_config(name)` or `rpc_client_config_ref(name)` when generated services call multiple upstream RPC services. Each client config must choose exactly one connection mode: `target`, `endpoints`, or `etcd`.
 
-`rozectl api generate` and `rozectl rpc generate` / `rpc protoc` can manage upstream RPC clients. Declare local RPC dependencies as `*-rpc` path dependencies in the target service `Cargo.toml`; the last segment before `-rpc` becomes the config key, so `shop-catalog-rpc` maps to `rpc_clients.catalog`. REST `.api` imports of pure RPC contracts declare the same dependency surface.
+The preferred Roze 1.x workflow manages generated API/RPC service dependencies through `roze-service.yaml` and `rozectl service dependency add/remove/list` plus `rozectl service sync`. The manifest is the source of truth for cross-service RPC dependencies; sync updates the `*-rpc` Cargo path dependency, generated non-secret defaults in `config/roze-dependencies.yaml`, and managed client fields/startup/readiness/accessors in `src/svc/mod.rs`. `service sync --check` should run in CI to catch drift.
 
-Generated `ServiceContext` connects each declared upstream RPC client once at startup, stores the cloneable client in a framework-owned field, registers `rpc:<name>` readiness after connection succeeds, and exposes a `<name>()` accessor. For an existing service, add both the Cargo dependency and matching `rpc_clients.<name>` config before running `--update`; do not hand-wire tonic channels in application logic when the generated surface can own them.
+Generated `ServiceContext` connects each declared upstream RPC client once at startup, stores the cloneable client in a framework-owned field, registers `rpc:<name>` readiness after connection succeeds, and exposes a `<name>()` accessor. Existing projects can be adopted by `dependency add`, which imports usable local `*-rpc` path dependencies and named `rpc_clients` config; it refuses migration when connection configuration is missing. Do not hand-wire tonic channels in application logic when the generated surface can own them.
+
+The manual `Cargo.toml` plus `rpc_clients.<name>` flow remains available for projects that have not adopted `roze-service.yaml`, but it is no longer the preferred path.
 
 Generated RPC clients pass the inbound `roze_context::Context` into Roze's shared retry executor. Retryable failures use exponential full-jitter backoff, service/method retry budgets, remaining-deadline checks before sleeping, and cancellation checks before and after sleep. `roze_resilience_decisions_total` records `attempt` only immediately before a real retry call; budget, deadline, and cancellation exhaustion use bounded decisions such as `budget_exhausted`, `deadline_exhausted`, and `cancelled`.
 

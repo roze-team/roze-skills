@@ -10,16 +10,19 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Roze `.api` and `.proto` contract-first development
 - Generated REST service structure with Roze native HTTP, Tower, and Roze middleware
 - Generated RPC service structure with tonic/prost, managed upstream RPC clients, readiness checks, and Roze context/error metadata
+- `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
 - Generated stream worker scaffolds with Roze MQ primitives
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
 - Application-owned vs generator-owned file boundaries
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers
 - Permission annotations, idempotency middleware, persistent outbox, object storage, cache consistency, and read-model query composition
+- Reporting and chart endpoint contracts backed by Roze report/query primitives
 - `.ent` model source guidance and ent-style query/create/update/delete/projection/aggregate/hook/policy/mixin builders
 - Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
 - Toasty and SeaORM model generation patterns
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
 - Config, registry, gateway native HTTP governance, MQ/job governance, cache, DTM, metrics, tracing, release gates, production evidence, and smoke/soak checks
+- Roze 1.x stability vs operational evidence guidance
 - Common troubleshooting paths for regeneration, validation, middleware, context, and local dependencies
 
 ## Install

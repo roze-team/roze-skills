@@ -96,7 +96,7 @@ DTM defaults to TCC. Saga is optional and should not weaken the default TCC stat
 
 ## Production And Smoke Verification
 
-Roze is currently pre-release. It is suitable for evaluation, internal pilots, and controlled production paths where teams pin a reviewed Git revision, inspect generated diffs, run smoke checks, and own production configuration, observability, rollback, auth, and dependency governance. Do not describe a module as production-stable unless the active checkout's maturity matrix and production evidence support that claim.
+Roze 1.x provides stable public APIs, CLI commands, generated layouts, configuration schemas, metrics/events, and documented runtime ordering under Semantic Versioning. Operational evidence is independent: stable API does not mean every workload, dependency topology, or failure mode is battle-tested. Pin the Roze Git revision or signed tag, inspect generated diffs, run smoke/release gates, and only make long-run production claims when the maturity matrix and production evidence link passing artifacts.
 
 Run targeted crate tests for local changes. Useful slices:
 
