@@ -1,6 +1,6 @@
 ---
 name: roze-skills
-description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze native HTTP/roze-http, Roze crates such as roze-rpc/roze-service/roze-config/roze-gateway/roze-mq/roze-search/roze-query/roze-migration/roze-orm/roze-report, managed upstream RPC clients and roze-service.yaml dependency manifests, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, gRPC health, service governance, gateway native HTTP policy, permission/idempotency middleware, persistent outbox, cache consistency, object storage, reporting/charts, model/search generation, ent-style query/create/update/delete/projection/aggregate/hook/policy/mixin builders, OpenAPI/Web SDK generation, contract diff, gate checks, generator extensions, API plugins, generated ops assets, release gates, production evidence, smoke/soak tests, or troubleshooting Roze project conventions.
+description: Roze Rust microservice framework knowledge for AI agents. Use when working with roze-team/roze, rozectl, Roze .api, .proto, .ent, model/search schemas, generated Rust REST/RPC/stream services, Roze native HTTP/roze-http, Roze crates such as roze-rpc/roze-service/roze-config/roze-gateway/roze-mq/roze-search/roze-query/roze-migration/roze-orm/roze-report, managed upstream RPC clients and roze-service.yaml dependency manifests, Rust ownership/lifetime/error/async/concurrency/performance/unsafe issues inside Roze code, service lifecycle/bootstrap, health/readiness probes, gRPC health, service governance, gateway native HTTP policy, permission/idempotency middleware, persistent outbox, cache consistency, object storage, reporting/charts and ReportDataSource hooks, model/search generation, ent-style query/create/update/delete/projection/aggregate/hook/policy/mixin builders, OpenAPI/Web SDK generation, contract diff, gate checks, generator extensions, API plugins, generated ops assets, generated production reference systems, release gates, production evidence verification/promotion, smoke/soak tests, or troubleshooting Roze project conventions.
 ---
 
 # Roze Skills
@@ -14,7 +14,7 @@ Roze is IDL-first and convention-driven:
 - Define REST routes, RPC methods, DTOs, and annotations in `.api` or `.proto` contracts.
 - Use `rozectl` to generate framework-owned boundaries.
 - Prefer Roze built-in generators, crates, middleware, config, governance, context, error, health, metrics, tracing, registry, gateway, cache, MQ, DTM, RPC-client, and search/model helpers before introducing custom infrastructure.
-- Put business behavior in generated extension points, especially `src/logic/**`, custom middleware, and application-owned modules.
+- Put business behavior in generated extension points, especially `src/logic/**`, custom middleware, `src/application.rs`, and application-owned modules.
 - Preserve generated ownership boundaries during regeneration.
 - Validate changes with targeted crate tests and smoke scripts.
 
@@ -35,7 +35,7 @@ Read only the files relevant to the current task:
 2. Identify whether the task touches generated code, runtime crates, application logic, docs, or tests.
 3. Check whether Roze already provides the needed capability through `rozectl`, a generated extension point, or a `roze-*` crate before writing custom framework code.
 4. If changing generated output, update the generator/templates/tests in `apps/rozectl` rather than hand-editing generated glue.
-5. If changing a generated service, keep application behavior in `src/logic/**`, `src/middleware/*.rs`, `src/model/*_ext.rs`, `src/stream/consumer.rs`, or app-owned modules.
+5. If changing a generated service, keep application behavior in `src/logic/**`, `src/application.rs`, `src/middleware/*.rs`, `src/model/*_ext.rs`, `src/stream/consumer.rs`, or app-owned modules.
 6. Prefer `--update` for regeneration. Use `--force` only for intentional full rebuilds.
 7. For Roze 1.x, treat public APIs, CLI commands, generated layouts, config schemas, metrics, and documented runtime ordering as SemVer-governed stable contracts. Keep operational evidence separate: pin the Roze Git revision or signed tag, review generated diffs, run documented smoke/release gates, and do not claim battle-tested 24h/72h behavior unless production evidence exists.
 8. Run focused verification. For generator work, include `cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo` unless the task needs real database inspect coverage.

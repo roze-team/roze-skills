@@ -11,6 +11,7 @@ config.yaml
 Cargo.toml
 src/
   main.rs
+  application.rs
   config/mod.rs
   route/
   handler/
@@ -24,6 +25,7 @@ src/
 Ownership rules:
 
 - `src/logic/**.rs` is the default place for business logic.
+- `src/application.rs` is the preserved async service-context configuration hook.
 - `src/handler/**` is generator-owned HTTP adaptation: parse request, extract context, call logic, wrap response.
 - `src/route/**` is generator-owned route registration.
 - `src/types/mod.rs` is generated DTO code from `.api`.
@@ -49,8 +51,10 @@ Generated REST services expose:
 - `GET /readyz`
 - `GET /startupz`
 - `GET /metrics`
-- `GET /reports/export`
-- `GET /charts/query`
+- `POST /reports/exports`
+- `GET /reports/exports/:id`
+- `DELETE /reports/exports/:id`
+- `POST /charts/query`
 - `GET /openapi.json`
 
 The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register dependency checks there when startup-created clients need readiness reporting.
@@ -59,7 +63,7 @@ The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register de
 
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
 
-`/reports/export` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols.
+`/reports/exports` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols. Register the whitelisted `Arc<dyn roze_report::ReportDataSource>` or `ReportCatalog` from `src/application.rs::configure_context`; an unconfigured source should fail closed with `503`, not return fabricated empty data.
 
 ## RPC Layout
 
@@ -72,6 +76,7 @@ build.rs
 proto/service.proto
 src/
   main.rs
+  application.rs
   client/mod.rs
   config/mod.rs
   pb/mod.rs
@@ -84,6 +89,7 @@ src/
 Ownership rules:
 
 - `src/logic/*.rs` is application-owned RPC business behavior and is preserved by `--update`.
+- `src/application.rs` is the preserved async service-context configuration hook.
 - `src/server/mod.rs` is generator-owned tonic server adaptation.
 - `src/client/mod.rs` is generator-owned client code.
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
@@ -195,7 +201,7 @@ Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for c
 
 ## Service Context And Lifecycle
 
-`src/svc/mod.rs` is the place for shared clients and framework state, not business workflows. Prefer generated `ServiceContext` slots and Roze crates for:
+`src/svc/mod.rs` is the place for shared clients and framework state, not business workflows. Use `src/application.rs::configure_context` for application-specific attachment of report data sources and other resources after the generated `ServiceContext` is constructed. Prefer generated `ServiceContext` slots and Roze crates for:
 
 - health registry and dependency readiness checks
 - optional cache clients

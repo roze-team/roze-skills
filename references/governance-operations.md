@@ -119,6 +119,7 @@ bash scripts/production-smoke.sh --with-compose
 bash scripts/rozectl-smoke.sh
 bash scripts/release-gate.sh
 bash scripts/production-evidence-smoke.sh
+bash scripts/production-evidence-promotion-smoke.sh
 ```
 
 `--with-compose` starts integration dependencies such as etcd, consul, Kafka, NATS, Redis, Postgres, MySQL, MongoDB, Elasticsearch, OpenSearch, and Meilisearch.
@@ -157,6 +158,16 @@ bash scripts/production-soak-config-center.sh 300
 bash scripts/production-soak-lifecycle.sh 300
 ```
 
+For generated service matrices, use:
+
+```bash
+bash scripts/generated-reference-systems.sh
+bash scripts/reference-systems-integration.sh
+bash scripts/production-soak-generated-systems.sh
+```
+
+These exercise the authoritative `example/production-systems/` inputs for REST/SQL/search, managed REST-to-RPC dependencies, stream workers, repeated regeneration, dependency disconnect/recovery, generated operations assets, and Docker-backed registry/storage/broker/search/database dependencies. Treat compile or short integration success as generator/runtime coverage, not as long-run production proof.
+
 Evidence reports should record the Roze Git revision, Rust toolchain, OS, command, dependency topology, workload, duration, success criteria, error budget, latency/throughput/resource trends, restart count, leak checks, failure injection timeline, and final verdict.
 
 Keep report verdicts conservative: use `inconclusive` until measurements and artifacts are filled in. Do not fabricate 24h/72h results or call beta/scaffold modules stable based only on short-run smoke checks.
@@ -174,6 +185,8 @@ bash scripts/production-evidence.sh \
 ```
 
 `scripts/production-evidence-smoke.sh` verifies report scaffold generation and rejects lifecycle summaries with missing fields, non-numeric fields, non-lifecycle usage, or inconsistent counts.
+
+Passing reports must come from fixed-runner artifacts, not from manual report edits. `scripts/production-soak-preflight.sh` validates the runner before long workloads. `scripts/production-evidence-promote.sh` promotes a downloaded artifact only after checking terminal run metadata, elapsed duration, resource samples, boundary summaries, portable SHA-256 manifests, artifact digest, and GitHub provenance. `scripts/production-evidence-report-verify.sh` is the independent predicate used by the maturity evidence gate, including area-specific boundary schemas, counter invariants, percentile ordering, fault counts, sampler coverage, and memory-decline bounds.
 
 `scripts/production-evidence-gate.sh` prevents runtime-critical maturity entries from moving to `stable` without complete passing 24h/72h evidence. Supply-chain gates should run RustSec advisory, dependency license, and registry/source policy checks against `Cargo.lock`, `audit.toml`, and `deny.toml`; exceptions must be narrow, owned, dated, and removable.
 

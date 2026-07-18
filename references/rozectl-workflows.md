@@ -50,6 +50,7 @@ Use `--update` for normal regeneration. It preserves:
 - REST `src/config/mod.rs`
 - REST `src/handler/<group>/<method>.rs`
 - REST/RPC `src/svc/mod.rs`
+- REST/RPC `src/application.rs`
 - REST custom middleware files under `src/middleware/<name>.rs`
 - RPC `src/config/mod.rs`
 - RPC `src/logic/<method>.rs`
@@ -59,6 +60,8 @@ Use `--update` for normal regeneration. It preserves:
 Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, and `proto/service.proto` is refreshed. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. RPC `--update` also preserves existing generated model composition, including `mod model;`, `ServiceContext::model()`, and Toasty registry wiring when the service already has generated models.
 
 Use `--force` only for a deliberate full rebuild.
+
+API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
 
 ## Service Dependencies
 
@@ -71,7 +74,7 @@ rozectl service dependency remove order --project services/payment
 rozectl service sync --project services/payment --check
 ```
 
-`dependency add` validates the upstream RPC crate/contract, writes the manifest, and synchronizes the `*-rpc` Cargo path dependency, non-secret defaults in `config/roze-dependencies.yaml`, managed client startup/readiness/accessor sections in `src/svc/mod.rs`, and the generated project kind (`api` or `rpc`). `service sync --check` writes nothing and fails on drift; run it in release pipelines for every service with `roze-service.yaml`.
+`dependency add` validates the upstream RPC crate/contract, writes the manifest, and synchronizes the `*-rpc` Cargo path dependency, non-secret defaults in `config/roze-dependencies.yaml`, managed client startup/readiness/accessor sections in `src/svc/mod.rs`, and the generated project kind (`api` or `rpc`). The first dependency add must canonicalize adopted local path dependencies immediately, including defaults and ordering, so an immediate `service sync --check` passes. `service sync --check` writes nothing and fails on drift; run it in release pipelines for every service with `roze-service.yaml`.
 
 `config/roze-dependencies.yaml` is loaded before `config.yaml`; deployment config and `ROZE__...` environment variables override generated dependency defaults. Do not put secrets, tokens, passwords, or certificates in `roze-service.yaml`.
 
@@ -157,7 +160,7 @@ Generate HTTP contract tests:
 rozectl test gen --api example/user.api --out contract-tests
 ```
 
-Generated contract tests cover API routes and framework-owned endpoints such as `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/openapi.json`, `/reports/export`, and `/charts/query`. Use `ROZE_E2E_SERVICES=name=http://host:port,...` to run the generated readiness flow against several services from one test command.
+Generated contract tests cover API routes and framework-owned endpoints such as `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/openapi.json`, `POST /reports/exports`, `GET/DELETE /reports/exports/:id`, and `POST /charts/query`. Use `ROZE_E2E_SERVICES=name=http://host:port,...` to run the generated readiness flow against several services from one test command.
 
 Generate OpenAPI:
 
@@ -245,5 +248,15 @@ cargo test -p rozectl generated_rest_project_compiles_with_model_and_search -- -
 cargo test -p rozectl generated_rpc_project_compiles -- --ignored
 cargo test -p rozectl generated_stream_project_compiles -- --ignored
 ```
+
+Generated production reference systems live under `example/production-systems/` in Roze. Use them when generator changes touch REST/SQL/search, managed REST-to-RPC dependencies, stream workers, repeated updates, dependency synchronization, or generated ops assets:
+
+```bash
+bash scripts/generated-reference-systems.sh
+bash scripts/reference-systems-integration.sh
+bash scripts/production-soak-generated-systems.sh
+```
+
+The generated reference-system matrix is compile/regeneration evidence. The integration and soak paths need Linux plus Docker-backed dependencies and are still not a substitute for a completed long-run promoted evidence report.
 
 Before a release, run `bash scripts/release-gate.sh` on Linux or WSL. On Windows, `powershell -ExecutionPolicy Bypass -File scripts/release-preflight.ps1` is useful but non-authoritative because it omits Unix-only rdkafka-enabled targets. Runtime-critical maturity changes also require `bash scripts/production-evidence-gate.sh`; model parity work should include `bash scripts/model-parity-gate.sh` when the active checkout provides it.
