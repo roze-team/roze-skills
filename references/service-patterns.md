@@ -113,7 +113,7 @@ Generated `ServiceContext` connects each declared upstream RPC client once at st
 
 The manual `Cargo.toml` plus `rpc_clients.<name>` flow remains available for projects that have not adopted `roze-service.yaml`, but it is no longer the preferred path.
 
-Generated RPC clients pass the inbound `roze_context::Context` into Roze's shared retry executor. Retryable failures use exponential full-jitter backoff, service/method retry budgets, remaining-deadline checks before sleeping, and cancellation checks before and after sleep. `roze_resilience_decisions_total` records `attempt` only immediately before a real retry call; budget, deadline, and cancellation exhaustion use bounded decisions such as `budget_exhausted`, `deadline_exhausted`, and `cancelled`.
+Generated RPC clients pass the inbound `roze_context::Context` into Roze's shared retry executor. Retryable failures use exponential full-jitter backoff, service/method retry budgets, remaining-deadline checks before sleeping, and cancellation checks before and after sleep. Request-level retry budget propagates as `x-roze-retry-budget-remaining`; if absent, the first governed RPC client initializes it from effective `max_attempts - 1` capped at 64. Context clones/forks share one atomic budget, concurrent downstream calls receive at most half the currently available credits, and unused child credits may be restored only up to the delegated amount. `roze_resilience_decisions_total` records `attempt` only immediately before a real retry call; budget, request-budget, deadline, and cancellation exhaustion use bounded decisions such as `budget_exhausted`, `request_budget_exhausted`, `deadline_exhausted`, and `cancelled`.
 
 ## Stream Worker Layout
 
@@ -151,6 +151,8 @@ Use `@permission` before REST routes or RPC methods to declare required permissi
 
 Generated application logic should read identity and authorization state through stable helpers such as `current_subject`, `current_user_id`, `current_admin_id`, `current_tenant`, `current_roles`, `current_permissions`, and `current_scope`. Applications still own authentication and must populate subject, tenant, roles, scopes, and permissions in `roze_context::Context`.
 
+When service-level `auth` is configured in `rest.middlewares`, generated common middleware should require Bearer JWTs except for `auth_public_routes`. Verified claims populate subject, tenant, roles, permissions, and scopes. Client-supplied identity propagation headers such as `x-roze-subject`, `x-roze-tenant`, roles, permissions, scopes, and legacy aliases are stripped by default; enable `trust_forwarded_identity_headers` only behind a trusted proxy that authenticates and replaces those headers.
+
 Use `@middleware idempotency` before mutating REST routes or RPC methods to opt into duplicate-request handling. REST requires an `Idempotency-Key` header and RPC requires `idempotency-key` metadata. Generated `ServiceContext` holds `Arc<dyn roze_middleware::IdempotencyStore>` and provides `with_idempotency_store` for a persistent Redis or database adapter; the in-memory default is only for local development and tests.
 
 Idempotency records include key scope, canonical request fingerprint, processing lease, and completed JSON response. Matching completed requests replay, live leases conflict, expired leases can be reclaimed, different requests with the same key conflict, and failed logic releases unfinished records. Preserve stable error codes such as `IDEMPOTENCY_MISSING_KEY`, `IDEMPOTENCY_IN_FLIGHT`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_STORAGE_UNAVAILABLE`, and `IDEMPOTENCY_REPLAY_INVALID`.
@@ -187,7 +189,7 @@ Cross-field comparisons should be generated only when both fields map to the sam
 
 ## Middleware
 
-Service-wide REST middleware lives under `rest.middlewares` in `config.yaml`. Built-ins include recover, trace, stat, prometheus, cors, timeout, max connections, shedding, gunzip, and request body limits.
+Service-wide REST middleware lives under `rest.middlewares` in `config.yaml`. Built-ins include recover, trace, stat, prometheus, cors, timeout, max connections, shedding, gunzip, request context, auth, and request body limits. Request body limits must enforce the actual decompressed body size before extraction, including requests without `Content-Length`, and return `413` without losing the accepted body for JSON/Form/custom extractors.
 
 Route-scoped middleware declared in `.api` is resolved as built-in first. Unknown names generate custom application middleware files.
 

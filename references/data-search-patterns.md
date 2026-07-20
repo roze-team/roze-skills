@@ -122,7 +122,7 @@ Handwritten extensions belong in application-owned files such as `src/model/<mod
 
 ## SQL And Mongo Input Notes
 
-Supported SQL DDL focuses on common MySQL and Postgres `CREATE TABLE` forms with a single primary key, common scalar column types, default values, comments, and auto-increment forms. Unsupported features such as composite keys and foreign keys should fail fast with clear errors.
+Supported SQL DDL focuses on common MySQL and Postgres `CREATE TABLE` forms with a single primary key, common scalar column types, default values, comments, and auto-increment forms. Standalone `CREATE INDEX` and `CREATE UNIQUE INDEX` declarations are accepted, including composite indexes and PostgreSQL partial indexes. Unsupported table features such as composite primary keys and foreign keys should fail fast with clear errors.
 
 Important SQL type mappings:
 

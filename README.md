@@ -21,7 +21,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
 - Toasty and SeaORM model generation patterns
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
-- Config, registry, gateway native HTTP governance, MQ/job governance, cache, DTM, metrics, tracing, release gates, generated production reference systems, production evidence verification/promotion, and smoke/soak checks
+- Config, registry, gateway native HTTP governance, MQ/job governance, cache, DTM, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
 - Roze 1.x stability vs operational evidence guidance
 - Common troubleshooting paths for regeneration, validation, middleware, context, and local dependencies
 
