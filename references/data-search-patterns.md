@@ -130,8 +130,9 @@ Important SQL type mappings:
 - PostgreSQL `NUMERIC`, `DECIMAL`, and `money` map to `rust_decimal::Decimal` or `Option<rust_decimal::Decimal>`.
 - Generated Toasty services with decimal fields add `rust_decimal` and Toasty's `rust_decimal` feature.
 - Generated SeaORM services with decimal fields add `rust_decimal` and SeaORM's `with-rust_decimal` feature.
-- SQL `JSON` and `JSONB` currently generate `String` so default Toasty models remain compilable.
-- ordinary SQL `INT` / `INTEGER` columns generate `i32`; `BIGINT` / `BIGSERIAL` columns generate 64-bit integer types.
+- SQL `JSON` and `JSONB` normalize to `.ent` `json`; SeaORM output uses `serde_json::Value`, while Toasty uses its JSON-string compatibility representation.
+- ordinary SQL `INT` / `INTEGER` columns generate `i32`; PostgreSQL `BIGINT` / `BIGSERIAL` / `INT8` and MySQL signed `BIGINT` generate `i64`; only explicit MySQL `BIGINT UNSIGNED` generates `u64`.
+- PostgreSQL `TIMESTAMP` and `TIMESTAMPTZ` preserve their distinction as `.ent` `timestamp` and `timestamptz`; SeaORM output uses chrono-backed `DateTime` and `DateTimeUtc`, and generation enables SeaORM `with-chrono` plus chrono `clock` and `serde` features, merging them into existing dependencies when present.
 
 Mongo inspection samples collection documents for field and type inference, maps `_id` to `id`, preserves unique/index metadata, emits helpers for unique and compound indexes, and can generate an `ObjectId` id model for empty collections.
 
