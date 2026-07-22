@@ -45,6 +45,8 @@ Logs for request-scoped work should include request id or trace id through spans
 
 Service discovery should go through `roze_rpc::registry`, including memory, DNS, etcd, consul, and cached resolver modes.
 
+Current etcd registry wiring does not yet carry `RpcClientEtcdConfig` TLS/auth fields into `RegistryConfig`, and `EtcdRegistry` does not build its HTTP client from those credentials. For production etcd clusters that require TLS or authentication, use a reviewed local proxy or application-owned integration until Roze adds authenticated client construction, token refresh, shared clients for register/discover/watch/keepalive/re-register, and TLS/auth failover tests.
+
 Prefer Roze registry, gateway, retry, timeout, breaker, rate-limit, fallback, and outlier detection surfaces before adding local service-discovery or traffic-governance code.
 
 Gateway upstreams can come from static upstream config or registry discovery. Dynamic discovery should filter by instance tags, health, and outlier state before weighted selection.
@@ -85,7 +87,7 @@ High-frequency in-memory lookup/index paths use concurrent maps/sets where the f
 
 Reliable event publishing should prefer outbox relay and publish through a `roze_mq::Publisher`.
 
-Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. Production services should inject a persistent adapter with `with_outbox_store`; database adapters should implement `TransactionalOutbox<Tx>` so business writes and outbox messages commit atomically before `relay_outbox_batch` publishes claimed messages and records retry state.
+Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. Roze does not yet ship an official SQL-backed outbox adapter; production services should inject a persistent adapter with `with_outbox_store`; database adapters should implement `TransactionalOutbox<Tx>` so business writes and outbox messages commit atomically before `relay_outbox_batch` publishes claimed messages and records retry state. Cover schema migrations, lease recovery, maximum retry/dead-letter policy, replay/query APIs, and monitoring metrics in application-owned adapters.
 
 Generated object-storage integration should keep application logic working with object keys and `FileMetadata`. Use `ServiceContext::media_url` / `resolve_media_url` instead of constructing provider URLs by hand; `issue_upload_token` should return normalized keys, expiration, upload policy, and provider presigned requests.
 
