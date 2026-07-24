@@ -36,6 +36,7 @@ Generate a stream worker scaffold from event-capable RPC/API contracts:
 
 ```bash
 cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --roze-source path
+cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --broker rdkafka --roze-source path
 ```
 
 Regenerate framework-owned files while preserving application-owned files:
@@ -161,6 +162,8 @@ rozectl test gen --api example/user.api --out contract-tests
 ```
 
 Generated contract tests cover API routes and framework-owned endpoints such as `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/openapi.json`, `POST /reports/exports`, `GET/DELETE /reports/exports/:id`, and `POST /charts/query`. Use `ROZE_E2E_SERVICES=name=http://host:port,...` to run the generated readiness flow against several services from one test command.
+
+For native WebSocket routes, add `@websocket` to a GET route in `.api`. `rozectl api generate --update` refreshes route/handler upgrade glue while preserving application-owned frame logic in `src/logic/**`; WebSocket routes are excluded from OpenAPI and normal HTTP SDK output and cannot use idempotency middleware.
 
 Generate OpenAPI:
 

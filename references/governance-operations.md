@@ -8,6 +8,8 @@ Applications should use `roze-config::ServiceConfig`. Local files default to `co
 
 Prefer Roze config loading, environment override, config center, typed service config, and hot-reload hooks before introducing application-local config systems.
 
+Use built-in secret references for sensitive configuration: `env://NAME`, `${NAME}`, and `file://path`. Relative secret files resolve beside the primary config file, trailing line endings are removed, and `load_with_secret_provider` supports custom providers. JWT key IDs must be unique, resolved HMAC secrets must be at least 32 bytes, and startup fails before listeners are created when secret resolution or validation fails. Debug output must identify references or key IDs only, never secret material.
+
 Config center reloads must preserve the last valid configuration when a new payload fails to parse. Rebuild hot-updated subsystems by changed section or config signature instead of restarting everything for unrelated changes.
 
 When adding config fields, update example configs, contract docs, and tests.
@@ -45,7 +47,7 @@ Logs for request-scoped work should include request id or trace id through spans
 
 Service discovery should go through `roze_rpc::registry`, including memory, DNS, etcd, consul, and cached resolver modes.
 
-Current etcd registry wiring does not yet carry `RpcClientEtcdConfig` TLS/auth fields into `RegistryConfig`, and `EtcdRegistry` does not build its HTTP client from those credentials. For production etcd clusters that require TLS or authentication, use a reviewed local proxy or application-owned integration until Roze adds authenticated client construction, token refresh, shared clients for register/discover/watch/keepalive/re-register, and TLS/auth failover tests.
+Etcd registry and RPC-client discovery support TLS, mTLS, authentication, token refresh, CA files, client cert/key pairs, and endpoint failover through `RegistryConfig` / `RpcClientEtcdConfig`. Configure cert/key fields together, keep `insecure_skip_verify` false outside controlled diagnostics, and keep credentials in secret references rather than `roze-service.yaml`.
 
 Prefer Roze registry, gateway, retry, timeout, breaker, rate-limit, fallback, and outlier detection surfaces before adding local service-discovery or traffic-governance code.
 
@@ -87,7 +89,7 @@ High-frequency in-memory lookup/index paths use concurrent maps/sets where the f
 
 Reliable event publishing should prefer outbox relay and publish through a `roze_mq::Publisher`.
 
-Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. Roze does not yet ship an official SQL-backed outbox adapter; production services should inject a persistent adapter with `with_outbox_store`; database adapters should implement `TransactionalOutbox<Tx>` so business writes and outbox messages commit atomically before `relay_outbox_batch` publishes claimed messages and records retry state. Cover schema migrations, lease recovery, maximum retry/dead-letter policy, replay/query APIs, and monitoring metrics in application-owned adapters.
+Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. `roze-transaction-sql` is the official PostgreSQL/MySQL `OutboxStore` and `TransactionalOutbox<sea_orm::DatabaseTransaction>` adapter; generated `outbox.store: auto` selects SQL when `database.url` is configured, and production rejects an enabled memory store. Use bundled migrations or an approved migration flow, then rely on `relay_outbox_batch` for claim, lease recovery, retry, dead-letter, replay, cleanup, and `roze_outbox_events_total` metrics.
 
 Generated object-storage integration should keep application logic working with object keys and `FileMetadata`. Use `ServiceContext::media_url` / `resolve_media_url` instead of constructing provider URLs by hand; `issue_upload_token` should return normalized keys, expiration, upload policy, and provider presigned requests.
 
@@ -97,7 +99,7 @@ Generated model repositories use versioned cache keys via `roze_cache::model_cac
 
 Use `roze-query::QueryComposer` for read-model fan-out. Configure total request budget, per-upstream timeout, max fan-out, concurrency, and strict vs partial failure behavior instead of hand-rolling joins across downstream calls.
 
-MQ consumers must make ack/nack, retry, dead letter, and idempotency behavior explicit.
+MQ consumers must make ack/nack, retry, dead letter, and idempotency behavior explicit. Kafka should be constructed through `roze_kafka::build_runtime` or generated stream workers so business code depends only on `roze_mq::{Publisher, Subscriber}`. Use provider `rdkafka` for production consumers; `rdkafka-cmake` is the Windows-friendly production build path, `memory` is for development/testing, and `rust-native`/rskafka is experimental publish-only because it lacks consumer groups and offset commit semantics.
 
 DTM defaults to TCC. Saga is optional and should not weaken the default TCC state machine.
 

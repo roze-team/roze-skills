@@ -37,7 +37,7 @@ Ownership rules:
 
 REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. HTTP errors should use Roze error types and helpers instead of custom JSON.
 
-Prefer generated REST adapters and Roze HTTP helpers for routing, request extraction, response wrapping, validation, timeout metadata, context propagation, middleware ordering, health, metrics, and OpenAPI exposure. Add custom Tower layers only after confirming the generated middleware/config surface cannot express the behavior.
+Prefer generated REST adapters and Roze HTTP helpers for routing, request extraction, response wrapping, validation, timeout metadata, context propagation, WebSocket upgrades, client address extraction, middleware ordering, health, metrics, and OpenAPI exposure. Add custom Tower layers only after confirming the generated middleware/config surface cannot express the behavior.
 
 Generated services and framework crates should not expose Axum types. Roze native HTTP owns the public REST surface: `roze_http::Router`, method routers, `MethodFilter`, `roze_http::body`, typed extractors such as `Path`, `RawPathParams`, `Query`, `Json`, `Form`, `State`, `Extension`, `OriginalUri`, `MatchedPath`, and `NestedPath`, `IntoResponse`, `Response`, `ErrorResponse`, and Tower-compatible middleware helpers.
 
@@ -64,6 +64,10 @@ The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register de
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
 
 `/reports/exports` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols. Register the whitelisted `Arc<dyn roze_report::ReportDataSource>` or `ReportCatalog` from `src/application.rs::configure_context`; an unconfigured source should fail closed with `503`, not return fabricated empty data.
+
+Annotate a GET route with `@websocket` to generate a native Roze WebSocket endpoint. Generated handler and route glue use `roze_http::ws::WebSocketUpgrade`; application-owned frame handling lives under `src/logic/**` and is preserved by `--update`. WebSocket routes use `EmptyReq`/`EmptyResp`, cannot use idempotency middleware, and are excluded from OpenAPI and normal HTTP SDK generation. Use `roze_http::ws::{WebSocket, Message, CloseFrame, WebSocketConfig}` instead of depending on Hyper upgrade internals.
+
+When `rest.connect_info: true`, generated entrypoints use `RestServer::with_connect_info()` so handlers and middleware can extract `ConnectInfo<SocketAddr>` and policy-resolved `roze_http::client_ip::ClientIp`. Forwarded headers are ignored unless the direct peer matches `rest.middlewares.trusted_proxy_cidrs`; configuring trusted proxy CIDRs without connect info is a startup error.
 
 ## RPC Layout
 
@@ -103,7 +107,7 @@ Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry
 
 Generated RPC entrypoints should use the same `roze_service::ServiceGroup` lifecycle behavior as REST services when available. Avoid creating separate shutdown channels or ad hoc readiness flags unless the active checkout lacks lifecycle support.
 
-Generated RPC servers register the standard `grpc.health.v1.Health` service. The overall server and generated protobuf service report `NOT_SERVING` during startup, dependency failure, and draining, and `SERVING` when the shared `HealthRegistry` is ready. The generated `grpc-health-sync` lifecycle task refreshes status and publishes `NOT_SERVING` before shutdown.
+Generated RPC servers use `roze_grpc::GrpcRouter` to dispatch standard `/{service}/{method}` paths and to register both the application service and `grpc.health.v1.Health`. The dependency graph should not reintroduce `axum` or `axum-core` for gRPC routing. The overall server and generated protobuf service report `NOT_SERVING` during startup, dependency failure, and draining, and `SERVING` when the shared `HealthRegistry` is ready. The generated `grpc-health-sync` lifecycle task refreshes status and publishes `NOT_SERVING` before shutdown.
 
 `roze-config::ServiceConfig` supports a default `rpc_client` and named `rpc_clients.<name>` entries. Use `ServiceConfig::rpc_client_config(name)` or `rpc_client_config_ref(name)` when generated services call multiple upstream RPC services. Each client config must choose exactly one connection mode: `target`, `endpoints`, or `etcd`.
 
@@ -111,7 +115,7 @@ The preferred Roze 1.x workflow manages generated API/RPC service dependencies t
 
 Generated `ServiceContext` connects each declared upstream RPC client once at startup, stores the cloneable client in a framework-owned field, registers `rpc:<name>` readiness after connection succeeds, and exposes a `<name>()` accessor. Existing projects can be adopted by `dependency add`, which imports usable local `*-rpc` path dependencies and named `rpc_clients` config; it refuses migration when connection configuration is missing. Do not hand-wire tonic channels in application logic when the generated surface can own them.
 
-Current generated dependency readiness is a startup marker, not a continuous probe for PostgreSQL, MySQL, Redis, NATS, etcd, or upstream RPC loss after initialization. Production services that require `/readyz` to track live dependency health should register dynamic `HealthRegistry::register_dependency` checks in application-owned code until the generator grows standard probes for databases, Redis `PING`, NATS state, authenticated etcd health, and gRPC health.
+Generated dependency readiness should use dynamic `HealthRegistry::register_dependency` checks where the runtime provides one: SQL health through `roze-db`, Redis `PING`, NATS state, object storage stat/probe where configured, and upstream RPC/gRPC health for managed clients. Avoid replacing these with one-time startup markers; app-owned resources attached through `src/application.rs` should register their own timeout-bound checks.
 
 The manual `Cargo.toml` plus `rpc_clients.<name>` flow remains available for projects that have not adopted `roze-service.yaml`, but it is no longer the preferred path.
 
@@ -155,7 +159,7 @@ Generated application logic should read identity and authorization state through
 
 When service-level `auth` is configured in `rest.middlewares`, generated common middleware should require Bearer JWTs except for `auth_public_routes`. Verified claims populate subject, tenant, roles, permissions, and scopes. Client-supplied identity propagation headers such as `x-roze-subject`, `x-roze-tenant`, roles, permissions, scopes, and legacy aliases are stripped by default; enable `trust_forwarded_identity_headers` only behind a trusted proxy that authenticates and replaces those headers.
 
-Use `@middleware idempotency` before mutating REST routes or RPC methods to opt into duplicate-request handling. REST requires an `Idempotency-Key` header and RPC requires `idempotency-key` metadata. Generated `ServiceContext` holds `Arc<dyn roze_middleware::IdempotencyStore>` and provides `with_idempotency_store` for a persistent Redis or database adapter; the in-memory default is only for local development and tests. Roze does not yet ship an official Redis-backed idempotency adapter, so production implementations must supply one explicitly and cover leases, fingerprint conflicts, completed response replay, restart recovery, and metrics.
+Use `@middleware idempotency` before mutating REST routes or RPC methods to opt into duplicate-request handling. REST requires an `Idempotency-Key` header and RPC requires `idempotency-key` metadata. Generated `ServiceContext` holds `Arc<dyn roze_middleware::IdempotencyStore>`. `idempotency.store: auto` selects `RedisIdempotencyStore` when `cache.url` exists, `redis` requires cache configuration, and a generated production service with idempotent routes refuses a memory store. Use service/environment-specific Redis key prefixes and load Redis URLs through secret configuration.
 
 Idempotency records include key scope, canonical request fingerprint, processing lease, and completed JSON response. Matching completed requests replay, live leases conflict, expired leases can be reclaimed, different requests with the same key conflict, and failed logic releases unfinished records. Preserve stable error codes such as `IDEMPOTENCY_MISSING_KEY`, `IDEMPOTENCY_IN_FLIGHT`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_STORAGE_UNAVAILABLE`, and `IDEMPOTENCY_REPLAY_INVALID`.
 
@@ -201,7 +205,7 @@ Prefer built-in middleware names in `.api` annotations and `config.yaml` before 
 
 Business logic should log with `tracing` macros directly. Do not pass or construct trace ids manually; Roze middleware carries trace ids in the request span.
 
-Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for configuration readiness, dependency setup, registry or subscription readiness, shutdown, stop, and failure. Native HTTP logs request start/completion; RPC governance logs method start/completion/cancellation. Safe `RUST_LOG=debug` framework logs may include route matches, middleware plans, retry decisions, stream ack/nack, model query kinds, and ServiceGroup phase changes, but must not include request/message bodies, auth values, SQL arguments, fallback payloads, or dependency error messages.
+Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for configuration readiness, dependency setup, registry or subscription readiness, shutdown, stop, and failure. Native HTTP logs request start/completion; RPC governance logs method start/completion/cancellation. Safe `RUST_LOG=debug` framework logs may include route matches, middleware plans, retry decisions, stream ack/nack, model query kinds, WebSocket lifecycle decisions, and ServiceGroup phase changes, but must not include request/message bodies, WebSocket message bodies, auth values, SQL arguments, fallback payloads, or dependency error messages.
 
 ## Service Context And Lifecycle
 
