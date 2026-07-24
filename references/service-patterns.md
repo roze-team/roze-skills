@@ -132,6 +132,7 @@ Ownership rules:
 - stream consumers should use `roze_mq::{Delivery, Subscriber}` and make `ack`, `nack`, retry, dead-letter, and idempotency behavior explicit.
 - stream handlers should preserve Roze tracing/context conventions and avoid blocking async worker tasks.
 - generated stream worker entrypoints should run under `roze_service::ServiceGroup`, propagate shutdown into consumer tasks, and stop workers before returning.
+- generated stream worker create, `--update`, and `--force` paths should leave framework-owned Rust glue rustfmt-clean while preserving `src/stream/consumer.rs` during updates.
 
 ## API Contract Syntax
 

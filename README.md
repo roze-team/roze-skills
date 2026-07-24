@@ -6,12 +6,12 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 
 ## What This Skill Covers
 
-- `rozectl` API/RPC/model/search/OpenAPI/Web SDK/deployment workflows
+- `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows
 - Roze `.api` and `.proto` contract-first development
 - Generated REST service structure with Roze native HTTP, Tower, and Roze middleware
 - Generated RPC service structure with tonic/prost, Roze gRPC routing, managed upstream RPC clients, readiness checks, and Roze context/error metadata
 - `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
-- Generated stream worker scaffolds with Roze MQ/Kafka provider primitives
+- Generated stream worker scaffolds with Roze MQ/Kafka provider primitives and rustfmt-clean generated Rust glue
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
 - Application-owned vs generator-owned file boundaries
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers

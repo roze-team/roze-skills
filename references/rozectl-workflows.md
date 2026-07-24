@@ -62,7 +62,7 @@ Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC s
 
 Use `--force` only for a deliberate full rebuild.
 
-API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
+API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
 
 ## Service Dependencies
 
@@ -179,6 +179,8 @@ rozectl api client js example/user.api --out sdk/user.js
 ```
 
 Roze currently scopes SDK generation to TypeScript and JavaScript Web clients. Do not document or invoke Dart, Java, Kotlin, Swift, iOS, or Android SDK generation unless the active checkout reintroduces those targets.
+
+Generated TypeScript interfaces preserve the complete API type graph independent of declaration order: custom object fields, nested custom objects, arrays such as `[]Type`/`Vec<Type>`, `Option<T>` nullability, JSON field renames, and `validate:"optional"` / `validate:"omitempty"` optional properties should remain typed instead of collapsing to `unknown`. JavaScript clients should carry the same request-building behavior with JSDoc typedefs.
 
 Generate Markdown API docs:
 
