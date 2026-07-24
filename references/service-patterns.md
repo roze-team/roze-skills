@@ -32,7 +32,7 @@ Ownership rules:
 - `src/openapi/mod.rs` is generated OpenAPI glue.
 - `src/middleware/mod.rs` is generated aggregation.
 - `src/middleware/*.rs` custom middleware files are application-owned and preserved by `--update`.
-- `src/svc/mod.rs` owns service dependencies; do not place business workflows there.
+- `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`; do not place custom resources or business workflows there.
 - `config.yaml` is local/deployment config and is preserved by `--update`.
 
 REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. HTTP errors should use Roze error types and helpers instead of custom JSON.
@@ -62,6 +62,8 @@ The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register de
 `HealthRegistry` executes registered dependency checks concurrently while preserving report order. Checks have a default timeout and panics are isolated into unhealthy probe results; use `HealthRegistry::with_check_timeout(Duration)` when a service needs a stricter budget.
 
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
+
+Generated REST and RPC entrypoints call `src/application.rs::register_services(&mut ServiceGroup, &ServiceContext)` before starting servers. Register application-owned background workers there so they share Roze shutdown, failure propagation, and lifecycle observability. Projects generated before this hook existed must add the current hook signature explicitly before upgrading; the generator does not inject a legacy shim.
 
 `/reports/exports` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols. Register the whitelisted `Arc<dyn roze_report::ReportDataSource>` or `ReportCatalog` from `src/application.rs::configure_context`; an unconfigured source should fail closed with `503`, not return fabricated empty data.
 
@@ -97,7 +99,7 @@ Ownership rules:
 - `src/server/mod.rs` is generator-owned tonic server adaptation.
 - `src/client/mod.rs` is generator-owned client code.
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
-- `src/svc/mod.rs` owns service dependencies only.
+- `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`.
 
 RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, request id, trace id, and locale.
 
@@ -162,6 +164,8 @@ When service-level `auth` is configured in `rest.middlewares`, generated common 
 
 Use `@middleware idempotency` before mutating REST routes or RPC methods to opt into duplicate-request handling. REST requires an `Idempotency-Key` header and RPC requires `idempotency-key` metadata. Generated `ServiceContext` holds `Arc<dyn roze_middleware::IdempotencyStore>`. `idempotency.store: auto` selects `RedisIdempotencyStore` when `cache.url` exists, `redis` requires cache configuration, and a generated production service with idempotent routes refuses a memory store. Use service/environment-specific Redis key prefixes and load Redis URLs through secret configuration.
 
+Generated TypeScript clients expose `IdempotentRequestOptions` and require `idempotencyKey` for idempotent REST route calls. Generated JavaScript clients document the same required option with JSDoc. The SDK forwards it as `Idempotency-Key`; callers must reuse a key only for retrying the same logical mutation.
+
 Idempotency records include key scope, canonical request fingerprint, processing lease, and completed JSON response. Matching completed requests replay, live leases conflict, expired leases can be reclaimed, different requests with the same key conflict, and failed logic releases unfinished records. Preserve stable error codes such as `IDEMPOTENCY_MISSING_KEY`, `IDEMPOTENCY_IN_FLIGHT`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_STORAGE_UNAVAILABLE`, and `IDEMPOTENCY_REPLAY_INVALID`.
 
 ## Field Sources And Types
@@ -169,6 +173,8 @@ Idempotency records include key scope, canonical request fingerprint, processing
 Fields can bind from `path`, `query`, `form`, `header`, or JSON tags. Without a source tag, `rozectl` infers path parameters from `:name` route segments and otherwise treats fields as JSON body fields.
 
 Generated DTO fields use Rust `snake_case` and `serde(rename = "...")` when wire names differ.
+
+Header fields marked `validate:"optional"` or `validate:"omitempty"` generate as `Option<T>` and are optional OpenAPI parameters. Missing headers reach application logic as `None`; present values are parsed and validated normally. Header fields without either rule remain required.
 
 Common scalar mappings:
 
@@ -210,7 +216,7 @@ Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for c
 
 ## Service Context And Lifecycle
 
-`src/svc/mod.rs` is the place for shared clients and framework state, not business workflows. Use `src/application.rs::configure_context` for application-specific attachment of report data sources and other resources after the generated `ServiceContext` is constructed. Prefer generated `ServiceContext` slots and Roze crates for:
+`src/svc/mod.rs` is the generated place for shared clients and framework state, not business workflows, and REST/RPC `--update` may replace it. Use `src/application.rs::configure_context` for application-specific attachment of report data sources and other resources after the generated `ServiceContext` is constructed, and `src/application.rs::register_services` for background workers that must join the generated `ServiceGroup`. Prefer generated `ServiceContext` slots and Roze crates for:
 
 - health registry and dependency readiness checks
 - optional cache clients

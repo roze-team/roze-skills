@@ -13,7 +13,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
 - Generated stream worker scaffolds with Roze MQ/Kafka provider primitives and rustfmt-clean generated Rust glue
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
-- Application-owned vs generator-owned file boundaries
+- Application-owned vs generator-owned file boundaries, including generator-owned `src/svc/mod.rs` and preserved `src/application.rs` hooks
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, cache, MQ, DTM, and search/model helpers
 - Permission annotations, idempotency middleware, Redis idempotency, persistent SQL outbox, object storage, cache consistency, and read-model query composition
 - Native WebSocket route generation, Roze WebSocket runtime API, client address extraction, and trusted proxy policy

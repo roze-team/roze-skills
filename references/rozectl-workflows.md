@@ -50,7 +50,6 @@ Use `--update` for normal regeneration. It preserves:
 - REST `src/logic/<group>/<method>.rs`
 - REST `src/config/mod.rs`
 - REST `src/handler/<group>/<method>.rs`
-- REST/RPC `src/svc/mod.rs`
 - REST/RPC `src/application.rs`
 - REST custom middleware files under `src/middleware/<name>.rs`
 - RPC `src/config/mod.rs`
@@ -58,7 +57,7 @@ Use `--update` for normal regeneration. It preserves:
 - `config.yaml`
 - model extension files `src/model/*_ext.rs`
 
-Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, and `proto/service.proto` is refreshed. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. RPC `--update` also preserves existing generated model composition, including `mod model;`, `ServiceContext::model()`, and Toasty registry wiring when the service already has generated models.
+Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, `proto/service.proto`, and REST/RPC `src/svc/mod.rs` is refreshed. Do not put custom fields, initialization, methods, or business workflows in `src/svc/mod.rs`; move them to preserved `src/application.rs` hooks before upgrading. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. If a service uses generated models, run model generation after REST/RPC regeneration so model-specific context wiring is re-applied to the refreshed service context.
 
 Use `--force` only for a deliberate full rebuild.
 
@@ -181,6 +180,8 @@ rozectl api client js example/user.api --out sdk/user.js
 Roze currently scopes SDK generation to TypeScript and JavaScript Web clients. Do not document or invoke Dart, Java, Kotlin, Swift, iOS, or Android SDK generation unless the active checkout reintroduces those targets.
 
 Generated TypeScript interfaces preserve the complete API type graph independent of declaration order: custom object fields, nested custom objects, arrays such as `[]Type`/`Vec<Type>`, `Option<T>` nullability, JSON field renames, and `validate:"optional"` / `validate:"omitempty"` optional properties should remain typed instead of collapsing to `unknown`. JavaScript clients should carry the same request-building behavior with JSDoc typedefs.
+
+For REST routes using `@middleware idempotency`, generated TypeScript clients require `IdempotentRequestOptions` with a reusable `idempotencyKey`; generated JavaScript clients document the same required option through JSDoc. The client forwards that value as `Idempotency-Key`, so callers must reuse it only for retries of the same logical mutation and generate a new value for a different mutation.
 
 Generate Markdown API docs:
 

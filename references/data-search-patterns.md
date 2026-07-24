@@ -114,9 +114,9 @@ Generated SeaORM, Toasty, and Mongo models expose deterministic fixture builders
 
 Generated repositories expose `seed_fixtures(count)` to insert repeatable data through the normal write path, including cache invalidation where applicable. Put application-specific relationships, cleanup, and assertions in preserved `<model>_ext.rs` files rather than editing generated fixture code.
 
-Service projects with `src/svc/mod.rs` can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
+Service projects can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point when model generation applies model context wiring. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
 
-For Toasty services, rozectl keeps the `toasty::models!(...)` registry in `src/svc/mod.rs` synchronized with the generated model set, for example `toasty::models!(crate::model::User, crate::model::AdminToken)`. Treat that registry, the optional Toasty database field, the `toasty` readiness check, and `ServiceContext::model()` as generated service-context wiring. Put custom repository behavior in `<model>_ext.rs` or application modules instead of hand-editing the registry.
+For Toasty services, rozectl model generation owns the `toasty::models!(...)` registry and related service-context wiring when it applies generated models. Because REST/RPC regeneration refreshes `src/svc/mod.rs`, run model generation after REST/RPC generation for services that rely on generated model context. Treat that registry, the optional Toasty database field, the `toasty` readiness check, and `ServiceContext::model()` as generated wiring. Put custom repository behavior in `<model>_ext.rs` or application modules instead of hand-editing the registry.
 
 Handwritten extensions belong in application-owned files such as `src/model/<model>_ext.rs`. Do not place business-specific query orchestration in generator-owned files.
 
