@@ -48,6 +48,8 @@ cargo run -p rozectl -- api generate example/user.api --out apps/roze-example --
 Use `--update` for normal regeneration. It preserves:
 
 - REST `src/logic/<group>/<method>.rs`
+- REST/RPC `src/logic/prelude.rs`
+- REST `src/logic/<group>/prelude.rs`
 - REST `src/config/mod.rs`
 - REST `src/handler/<group>/<method>.rs`
 - REST/RPC `src/application.rs`
@@ -57,11 +59,11 @@ Use `--update` for normal regeneration. It preserves:
 - `config.yaml`
 - model extension files `src/model/*_ext.rs`
 
-Generated glue such as route registration, handler indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, `proto/service.proto`, and REST/RPC `src/svc/mod.rs` is refreshed. Do not put custom fields, initialization, methods, or business workflows in `src/svc/mod.rs`; move them to preserved `src/application.rs` hooks before upgrading. RPC `--update` removes stale generated logic module declarations for deleted RPC methods while preserving custom declarations in `src/logic/mod.rs`. If a service uses generated models, run model generation after REST/RPC regeneration so model-specific context wiring is re-applied to the refreshed service context.
+Generated glue such as route registration, handler indexes, generated logic indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, `proto/service.proto`, and REST/RPC `src/svc/mod.rs` is refreshed. Do not put custom fields, initialization, methods, or business workflows in `src/svc/mod.rs`; move them to preserved `src/application.rs` hooks before upgrading. Put shared custom logic module declarations, imports, attributes, and re-exports in preserved `src/logic/prelude.rs`; put REST group-local declarations in `src/logic/<group>/prelude.rs`. RPC `--update` removes stale generated logic declarations from `src/logic/mod.rs`, so do not rely on that generated index for custom module declarations. On the first update of legacy projects, `rozectl` can transactionally append a missing default `register_services` hook and migrate resolvable custom `mod` plus related `use` declarations from old generated logic indexes into the matching prelude; the migration runs in the staging project and repeated updates preserve the migrated files. If a service uses generated models, run model generation after REST/RPC regeneration so model-specific context wiring is re-applied to the refreshed service context.
 
 Use `--force` only for a deliberate full rebuild.
 
-API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
+API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Stream targets excluded by a parent Cargo workspace receive standalone package metadata, explicit dependency versions, an empty local `[workspace]` boundary, and are not added to the parent workspace members; this manifest shape should remain stable across repeated updates. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
 
 ## Service Dependencies
 

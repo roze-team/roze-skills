@@ -6,13 +6,19 @@ Use this reference for production behavior across config, middleware, registry, 
 
 Applications should use `roze-config::ServiceConfig`. Local files default to `config.yaml`; environment variables and config center values are overrides or hot-update sources.
 
-Prefer Roze config loading, environment override, config center, typed service config, and hot-reload hooks before introducing application-local config systems.
+Prefer Roze config loading, environment override, config center, typed service config, strict service validation, and hot-reload hooks before introducing application-local config systems.
 
 Use built-in secret references for sensitive configuration: `env://NAME`, `${NAME}`, and `file://path`. Relative secret files resolve beside the primary config file, trailing line endings are removed, and `load_with_secret_provider` supports custom providers. JWT key IDs must be unique, resolved HMAC secrets must be at least 32 bytes, and startup fails before listeners are created when secret resolution or validation fails. Debug output must identify references or key IDs only, never secret material.
 
 Config center reloads must preserve the last valid configuration when a new payload fails to parse. Rebuild hot-updated subsystems by changed section or config signature instead of restarting everything for unrelated changes.
 
+Generated services should load config through `roze_config::load_service`, which resolves secrets and validates semantic constraints before listeners bind. Production rejects unknown fields, invalid governance ranges, zero limits or timeouts, invalid rate-limit key policies, missing production Redis configuration for enabled rate limits, and empty rate-limit namespaces. Development and test profiles keep unknown fields warning-only so app-owned experimental sections remain usable. Debug output must redact database, cache, broker, storage, registry, RPC-client, rate-limit Redis, token, and credential values. Roze now uses `jsonwebtoken` 11 while retaining the explicit AWS-LC provider and existing JWT/OIDC validation contract.
+
 When adding config fields, update example configs, contract docs, and tests.
+
+Database config supports `direct`, `proxy`, and `sharded` modes. Direct/proxy modes use one logical primary `url` plus optional top-level `replicas`; proxy mode delegates physical table sharding to a ShardingSphere/Vitess-compatible proxy. Native sharded mode requires `database.topology.name`, `routing: fnv1a64-jump-v1`, and explicit shard IDs with one primary and optional replicas. In sharded mode, top-level `url` and `replicas` must be absent. Duplicate, empty, or unsafe shard IDs fail startup, and pool limits apply per primary or replica.
+
+Treat shard topology changes as data-placement changes. Reordering YAML is safe because shard IDs are sorted before routing, but adding a shard ID must append after existing IDs to keep Jump Hash movement bounded. Insert, removal, or rename requires an application-owned migration or dual-read/write plan before publishing the topology. Roze does not move shard data automatically.
 
 ## Context, Errors, Logs, And Metrics
 
@@ -40,6 +46,7 @@ Metrics conventions:
 - RPC method metrics: `roze_rpc_method_*`
 - gateway metrics: `roze_gateway_*`
 - MQ metrics include topic, group, partition, offset, attempt, and outcome labels where relevant
+- database sharding metrics include `roze_database_shard_routes_total{topology,shard}` and `roze_database_shard_health_checks_total{topology,shard,outcome}`
 
 Logs for request-scoped work should include request id or trace id through spans. Governance events such as hot reload, retry, breaker, rate limit, dead letter, and fallback should use structured fields.
 
@@ -61,7 +68,13 @@ Retries should count only real retry attempts, not the final failed attempt.
 
 REST applies timeout, rate limit, breaker, shedding, and fallback. RPC applies timeout, retry budget, rate limit, breaker, shedding, and fallback. MQ `spawn_consumer_with_governance` and job helpers such as `add_governed`, `spawn_with_governance`, and `spawn_once_with_governance` apply timeout, bounded full-jitter retry, retry budget, rate limit, breaker, and shedding before ack/nack or job completion settlement. Fallback is response-oriented; MQ and Job must not reinterpret fallback as ack, success, or suppressed failure.
 
-All governed boundaries should emit `roze_resilience_decisions_total` with bounded `boundary` values such as `rest`, `rpc`, `gateway`, `mq`, or `job`. Keep policy state local to the data path so control-plane availability is not required for each request, message, or job execution.
+All governed boundaries should emit `roze_resilience_decisions_total` with bounded `boundary` values such as `rest`, `rpc`, `gateway`, `mq`, or `job`. Keep policy state local to the data path except for explicitly configured external stores such as Redis-backed rate limiting.
+
+Distributed rate limiting uses one Roze contract across REST, RPC, and Gateway. `governance.rate_limiter.store: auto` selects an explicit `governance.rate_limiter.redis_url`, then `cache.url`, then memory only outside production; `redis` requires a usable URL. `key_prefix` plus namespace scopes Redis keys, and generated services default namespace to `ServiceConfig.profile`. Store operations are bounded by `timeout_ms`; `fail-closed` returns REST/Gateway `503` or RPC `Unavailable` on store outage, while `fail-open` allows the request and records a degraded decision.
+
+Rate-limit keys are composite and ordered. Supported dimensions are route, verified client IP, authenticated subject, authenticated tenant, and explicitly listed headers or RPC metadata. Use `missing: reject` for production policies unless grouping missing identities is intentional. Header dimensions must not contain secrets; prefer subject or tenant claims over client-controlled headers. Roze hashes complete identity material before storage, and raw identity values must not appear in Redis keys, logs, or metrics.
+
+Shard and rate-limit metric labels must stay bounded. Never use tenant IDs, raw shard keys, database URLs, SQL, credentials, auth values, request bodies, subjects, client IPs, or arbitrary header values as metric labels or debug log fields.
 
 ## Gateway Native HTTP Governance
 

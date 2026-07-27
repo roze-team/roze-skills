@@ -25,6 +25,9 @@ src/
 Ownership rules:
 
 - `src/logic/**.rs` is the default place for business logic.
+- `src/logic/prelude.rs` is application-owned shared logic prelude for declarations, imports, attributes, and re-exports that generated REST logic modules include.
+- `src/logic/<group>/prelude.rs` is application-owned REST group-local prelude when generated.
+- `src/logic/mod.rs` and REST `src/logic/<group>/mod.rs` are generated indexes and are refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
 - `src/handler/**` is generator-owned HTTP adaptation: parse request, extract context, call logic, wrap response.
 - `src/route/**` is generator-owned route registration.
@@ -63,7 +66,7 @@ The generated `ServiceContext` owns a `roze_health::HealthRegistry`. Register de
 
 Generated entrypoints should run under `roze_service::ServiceGroup` when the active checkout supports it. On shutdown, generated lifecycle glue marks the shared `HealthRegistry` as draining so `/readyz` stops reporting ready while the process exits through the unified shutdown path.
 
-Generated REST and RPC entrypoints call `src/application.rs::register_services(&mut ServiceGroup, &ServiceContext)` before starting servers. Register application-owned background workers there so they share Roze shutdown, failure propagation, and lifecycle observability. Projects generated before this hook existed must add the current hook signature explicitly before upgrading; the generator does not inject a legacy shim.
+Generated REST and RPC entrypoints call `src/application.rs::register_services(&mut ServiceGroup, &ServiceContext)` before starting servers. Register application-owned background workers there so they share Roze shutdown, failure propagation, and lifecycle observability. On the first `--update` of projects generated before this hook existed, `rozectl` can append the default no-op hook transactionally, then preserves the file on later updates.
 
 `/reports/exports` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols. Register the whitelisted `Arc<dyn roze_report::ReportDataSource>` or `ReportCatalog` from `src/application.rs::configure_context`; an unconfigured source should fail closed with `503`, not return fabricated empty data.
 
@@ -95,6 +98,8 @@ src/
 Ownership rules:
 
 - `src/logic/*.rs` is application-owned RPC business behavior and is preserved by `--update`.
+- `src/logic/prelude.rs` is application-owned shared logic prelude for declarations, imports, attributes, and re-exports that generated RPC logic modules include.
+- `src/logic/mod.rs` is a generated index and is refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
 - `src/server/mod.rs` is generator-owned tonic server adaptation.
 - `src/client/mod.rs` is generator-owned client code.
@@ -105,7 +110,7 @@ RPC servers should restore request context with `roze_rpc::rpc::request_context`
 
 Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 
-`rozectl rpc protoc --update` should preserve custom module declarations in `src/logic/mod.rs` as well as application-owned files under `src/logic/**`.
+`rozectl rpc protoc --update` preserves application-owned logic files and `src/logic/prelude.rs`, but refreshes `src/logic/mod.rs` to match current RPC methods. Move custom module declarations, imports, attributes, and re-exports into the prelude before regenerating.
 
 Generated RPC entrypoints should use the same `roze_service::ServiceGroup` lifecycle behavior as REST services when available. Avoid creating separate shutdown channels or ad hoc readiness flags unless the active checkout lacks lifecycle support.
 
@@ -122,6 +127,8 @@ Generated dependency readiness should use dynamic `HealthRegistry::register_depe
 The manual `Cargo.toml` plus `rpc_clients.<name>` flow remains available for projects that have not adopted `roze-service.yaml`, but it is no longer the preferred path.
 
 Generated RPC clients pass the inbound `roze_context::Context` into Roze's shared retry executor. Retryable failures use exponential full-jitter backoff, service/method retry budgets, remaining-deadline checks before sleeping, and cancellation checks before and after sleep. Request-level retry budget propagates as `x-roze-retry-budget-remaining`; if absent, the first governed RPC client initializes it from effective `max_attempts - 1` capped at 64. Context clones/forks share one atomic budget, concurrent downstream calls receive at most half the currently available credits, and unused child credits may be restored only up to the delegated amount. `roze_resilience_decisions_total` records `attempt` only immediately before a real retry call; budget, request-budget, deadline, and cancellation exhaustion use bounded decisions such as `budget_exhausted`, `request_budget_exhausted`, `deadline_exhausted`, and `cancelled`.
+
+REST and RPC route/method rate limiting uses the generated `Arc<roze_rate_limit::RateLimiter>` from `ServiceContext`, not process-local ad hoc counters. REST rejections return HTTP `429` with integer `Retry-After`; RPC rejections use gRPC `ResourceExhausted` with `retry-after` metadata. Redis-backed stores are registered in readiness as `rate-limit:redis`; production services with rate limiting enabled must not fall back to memory.
 
 ## Stream Worker Layout
 
@@ -220,6 +227,7 @@ Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for c
 
 - health registry and dependency readiness checks
 - optional cache clients
+- shared memory/Redis rate limiter
 - optional NATS JetStream/MQ clients
 - outbox relay state and persistent outbox stores
 - optional object storage clients
@@ -227,6 +235,8 @@ Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for c
 - managed upstream RPC clients discovered by `rozectl`
 - model/search clients generated by `rozectl`
 - registry/config/gateway clients where the generated surface supports them
+
+Generated model clients attached to `ServiceContext` own Roze database routing. For sharded entities, use generated routed accessors such as `ctx.model().order_for_key(&tenant_id)?` or `ctx.model().toasty_db_for_key(&tenant_id)?`; a plain repository accessor for a sharded SeaORM model is intentionally rejected before SQL. Use `ctx.sharded_db()?` and `transaction_for_key` for explicitly pinned single-shard transactions.
 
 `roze_service::ServiceGroup` provides `RuntimeService`, `FnService`, `ServiceGroupConfig`, `ServiceGroupHandle`, and `LifecycleState` with `Starting`, `Running`, `Draining`, `Stopped`, and `Failed` phases. Use it for HTTP/RPC/consumer/job/background services that must share one shutdown signal and stop-hook timeout. When jobs are involved, prefer the `roze-job::JobService` adapter instead of hand-rolled loops.
 

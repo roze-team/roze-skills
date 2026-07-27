@@ -94,6 +94,16 @@ Projection helpers should apply predicates before projection. For nullable field
 
 Roze tracks practical ent parity by generated API, runtime semantics, regeneration behavior, and backend evidence. Prefer the wording "ent-style generated model API" unless the active checkout's parity matrix and `scripts/model-parity-gate.sh` support stronger claims. In-scope parity includes fields/indexes/defaults, custom/composite IDs, ordinary/inverse/Through edges, predicates, `HasX`/`HasXWith`, ordering/pagination/projection/aggregation, create/update/delete, eager loading, hooks/interceptors, privacy/policy, mixins, migrations, and generator extensions.
 
+## Explicit Database Sharding
+
+Use `.ent` `Annotations(RozeShard("<key>", "<topology>", "<group>"))` for models that must be routed through Roze native database sharding. The shard key field must exist, be non-null, and immutable. All models in the same co-location group must use the same topology, key name, and key type.
+
+Roze routing is explicit. SeaORM clients expose `<model>_for_key(&key)` for sharded entities, and unrouted `ctx.model().<model>()` access fails before SQL. Toasty clients expose `toasty_db_for_key(&key)` and currently route to shard primaries; applications that need Toasty replica reads must make that choice explicit. Non-sharded entities continue to use ordinary generated accessors.
+
+Roze hashes the application-supplied shard key with the versioned `fnv1a64-jump-v1` route. Strings use UTF-8 bytes, byte keys use their bytes unchanged, fixed-width integers use little-endian bytes, and `isize`/`usize` normalize to 64 bits. Treat routing algorithm or key encoding changes as data-placement compatibility changes.
+
+Do not assume transparent scatter-gather queries or implicit distributed transactions. Compose cross-shard reads in application logic, and use Saga, TCC, Outbox, or compensation explicitly for cross-shard workflows. `ShardedDatabase::transaction_for_key` pins a transaction to one shard, and `ShardTransaction::ensure_key` rejects keys that resolve elsewhere.
+
 ## Model Operation Chain
 
 `roze-orm` defines one ordered around-chain contract for mutation hooks, query interceptors, and traversal interceptors. The first registered middleware is outermost. Generated SeaORM and Toasty create/update/delete builders expose `hook(...)`; query builders expose asynchronous `around(...)`; older synchronous `intercept(...)` remains for predicate/order rewriting.
@@ -108,13 +118,15 @@ Generated edge traversal methods such as `traverse_<edge>` return typed target q
 
 Use `plan_apply` or backend-specific planning/status helpers for dry-run evidence before changing a database. Planning rejects duplicate versions, unknown applied versions, and version/name drift. Rollback planning emits reverse-ordered steps down to the requested applied version boundary and rejects missing reverse SQL before execution begins. Apply and rollback execution run SQL statements and ledger updates in one database transaction. Production migrations should include reverse SQL unless an explicit irreversible-release policy is documented.
 
+For sharded databases, use `roze-migration` shard fan-out helpers for PostgreSQL, MySQL, or SQLite. They execute shards in declared order and return a `ShardMigrationReport`; a failure reports the failed shard and completed outcomes, but the fan-out is not globally atomic.
+
 ## Fixtures And Seeds
 
 Generated SeaORM, Toasty, and Mongo models expose deterministic fixture builders such as `Model::fixture(index)`. Fixtures should be repeatable for the same index, distinct across common scalar values, choose the first declared enum value, and populate `Option` and collection fields.
 
 Generated repositories expose `seed_fixtures(count)` to insert repeatable data through the normal write path, including cache invalidation where applicable. Put application-specific relationships, cleanup, and assertions in preserved `<model>_ext.rs` files rather than editing generated fixture code.
 
-Service projects can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point when model generation applies model context wiring. SeaORM service code enters repositories with `ctx.model().user()...`; Toasty service code can use `ctx.model().toasty_db()?` and `UserRepository::query(&mut db)`.
+Service projects can get `src/model/client.rs`, `ModelClient`, and `ServiceContext::model()` as the ent-style entry point when model generation applies model context wiring. SeaORM service code enters ordinary repositories with `ctx.model().user()...` and sharded repositories with `ctx.model().user_for_key(&tenant_id)?...`; Toasty service code can use `ctx.model().toasty_db()?` for direct/proxy mode or `ctx.model().toasty_db_for_key(&tenant_id)?` for sharded mode before calling `UserRepository::query(&mut db)`.
 
 For Toasty services, rozectl model generation owns the `toasty::models!(...)` registry and related service-context wiring when it applies generated models. Because REST/RPC regeneration refreshes `src/svc/mod.rs`, run model generation after REST/RPC generation for services that rely on generated model context. Treat that registry, the optional Toasty database field, the `toasty` readiness check, and `ServiceContext::model()` as generated wiring. Put custom repository behavior in `<model>_ext.rs` or application modules instead of hand-editing the registry.
 

@@ -17,14 +17,17 @@ Symptom: generated logic or config changed unexpectedly.
 Prefer `--update`, not `--force`. Confirm the file is application-owned:
 
 - REST logic: `src/logic/**.rs`
+- REST/RPC shared logic prelude: `src/logic/prelude.rs`
+- REST group logic prelude: `src/logic/<group>/prelude.rs`
 - RPC logic: `src/logic/*.rs`
-- RPC logic module declarations: `src/logic/mod.rs`
 - custom REST middleware: `src/middleware/*.rs`
 - config: `config.yaml`
 - model extensions: `src/model/*_ext.rs`
 - stream business consumer: `src/stream/consumer.rs`
 
 If a generator-owned file was edited by hand, move the intended behavior into templates/generator code or into an application-owned extension point.
+
+Generated logic indexes such as `src/logic/mod.rs` and REST `src/logic/<group>/mod.rs` are refreshed. Move shared custom module declarations, imports, attributes, and re-exports into `src/logic/prelude.rs`; move REST group-local helpers into `src/logic/<group>/prelude.rs`.
 
 Symptom: regenerated model files removed or changed unexpectedly.
 
@@ -43,6 +46,18 @@ Check `rest.middlewares.timeout` and route governance overrides. `timeout: true`
 Symptom: generated REST code imports Axum types.
 
 Check whether the service was generated from an older Roze checkout. Current generated REST code should use Roze native HTTP APIs such as `roze_http::Router`, extractors, responses, body helpers, and Tower-compatible middleware. Regenerate with the current `rozectl` and keep any custom HTTP behavior in application-owned logic or middleware.
+
+Symptom: production service refuses to start when rate limiting is enabled.
+
+Check `governance.rate_limiter`. Production requires Redis-backed rate limiting through explicit `governance.rate_limiter.redis_url` or `cache.url`; `store: auto` may use memory only outside production. Also check positive `timeout_ms`, valid key dimensions, non-duplicate headers, and a non-empty namespace.
+
+Symptom: requests are unexpectedly rate limited or share quota.
+
+Check `governance.rate_limit.key`. Dimensions are composed in declaration order from route, verified client IP, subject, tenant, and configured headers or RPC metadata. With `missing: reject`, absent identity dimensions reject the request; with `missing: omit`, anonymous and authenticated traffic can intentionally share a bucket. For REST `client_ip`, enable `rest.connect_info` and configure trusted proxy CIDRs if forwarded headers are expected.
+
+Symptom: production config rejects a field that worked in development.
+
+Generated services use `roze_config::load_service`. Production treats unknown fields and invalid governance/rate-limit ranges as fatal before listeners start, while development/test profiles keep unknown fields warning-only. Fix the field path reported in the error instead of weakening production validation.
 
 ## Validation Issues
 
@@ -108,6 +123,18 @@ Generated ent-style predicates include `contains`/`icontains` helpers and escape
 Symptom: ent-style projection helper is missing after regeneration.
 
 Confirm the active checkout includes the projection helper and that the field type supports it. Current query builders can emit `pluck_<field>`, `unique_<field>`, `count_by_<field>`, `first_<field>`, `only_<field>`, numeric `sum_<field>`, `avg_<field>`, `min_<field>`, and `max_<field>` where supported.
+
+Symptom: sharded database config fails during startup.
+
+Check `database.mode`. Sharded mode requires `database.topology.name`, `routing: fnv1a64-jump-v1`, and shard entries with safe unique IDs and primary URLs. Do not keep top-level `database.url` or top-level `replicas` in sharded mode. Direct/proxy mode should keep the single logical URL shape instead.
+
+Symptom: generated sharded model access fails before SQL.
+
+Check the `.ent` `RozeShard` annotation and call site. The shard key must exist, be non-null, and immutable, and all models in a co-location group must share topology, key name, and key type. SeaORM callers must use `ctx.model().<model>_for_key(&key)?`; Toasty callers must select `ctx.model().toasty_db_for_key(&key)?` before repository queries.
+
+Symptom: data appears on the wrong shard after a topology edit.
+
+Treat shard ID insertions, removals, renames, or non-append additions as data-placement changes. Roze does not migrate data automatically; use an application-owned migration, dual-read/write, or proxy strategy before publishing the new topology.
 
 ## Generated Ops Verification Issues
 
