@@ -14,6 +14,10 @@ Config center reloads must preserve the last valid configuration when a new payl
 
 Generated services should load config through `roze_config::load_service`, which resolves secrets and validates semantic constraints before listeners bind. Production rejects unknown fields, invalid governance ranges, zero limits or timeouts, invalid rate-limit key policies, missing production Redis configuration for enabled rate limits, and empty rate-limit namespaces. Development and test profiles keep unknown fields warning-only so app-owned experimental sections remain usable. Debug output must redact database, cache, broker, storage, registry, RPC-client, rate-limit Redis, token, and credential values. Roze now uses `jsonwebtoken` 11 while retaining the explicit AWS-LC provider and existing JWT/OIDC validation contract.
 
+Generated REST/RPC binaries resolve configuration from `ROZE_CONFIG_PATH`, then `config.yaml` beside the crate manifest, then working-directory `config.yaml`. In deployments, prefer `ROZE_CONFIG_PATH` pointing at the deployment-owned YAML and keep source-tree configs as examples or development defaults.
+
+AI provider settings live under `ServiceConfig.ai` and use the same secret reference resolution. `roze-ai` must not read config files or environment variables directly; provider debug output must not include API keys.
+
 When adding config fields, update example configs, contract docs, and tests.
 
 Database config supports `direct`, `proxy`, and `sharded` modes. Direct/proxy modes use one logical primary `url` plus optional top-level `replicas`; proxy mode delegates physical table sharding to a ShardingSphere/Vitess-compatible proxy. Native sharded mode requires `database.topology.name`, `routing: fnv1a64-jump-v1`, and explicit shard IDs with one primary and optional replicas. In sharded mode, top-level `url` and `replicas` must be absent. Duplicate, empty, or unsafe shard IDs fail startup, and pool limits apply per primary or replica.
@@ -39,6 +43,8 @@ HTTP errors use `RozeError` and `roze-result::ApiResponse`. RPC errors use `roze
 Prefer Roze context, error, result, tracing, and metrics helpers at every protocol boundary. Do not invent parallel request-id, trace-id, locale, tenant, response-envelope, or error-code conventions inside one service.
 
 Context is request metadata, not a global resource container. Keep DB/Redis/RPC clients in `ServiceContext`; keep business user details in explicit request extensions or logic parameters. Do not automatically propagate tokens, cookies, authorization headers, arbitrary user input, or high-cardinality values into context metadata or metrics labels.
+
+AI model, tool, workflow, RAG, and team boundaries must receive the inbound Roze context. Do not create a separate AI context, permission system, retry loop, cache, storage layer, or service lifecycle.
 
 Metrics conventions:
 

@@ -39,6 +39,13 @@ cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker -
 cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --broker rdkafka --roze-source path
 ```
 
+Generate an AI module inside an existing generated REST/RPC project:
+
+```bash
+cargo run -p rozectl -- ai generate assistant --out services/support --roze-source path
+rozectl ai generate assistant --out services/support --with-workflow --with-rag --with-team
+```
+
 Regenerate framework-owned files while preserving application-owned files:
 
 ```bash
@@ -64,6 +71,8 @@ Generated glue such as route registration, handler indexes, generated logic inde
 Use `--force` only for a deliberate full rebuild.
 
 API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Stream targets excluded by a parent Cargo workspace receive standalone package metadata, explicit dependency versions, an empty local `[workspace]` boundary, and are not added to the parent workspace members; this manifest shape should remain stable across repeated updates. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
+
+AI generation is also transactional and independent from API/RPC/model/search/stream generation. `src/ai/mod.rs` and `src/ai/generated.rs` are framework-owned; `src/ai/agent.rs`, `src/ai/tools.rs`, `src/ai/prompts/**`, optional `workflow.rs`, `rag.rs`, and `team.rs` are application-owned and preserved by `--update`. `--force` replaces the complete AI scaffold intentionally.
 
 ## Service Dependencies
 
@@ -164,7 +173,7 @@ rozectl test gen --api example/user.api --out contract-tests
 
 Generated contract tests cover API routes and framework-owned endpoints such as `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/openapi.json`, `POST /reports/exports`, `GET/DELETE /reports/exports/:id`, and `POST /charts/query`. Use `ROZE_E2E_SERVICES=name=http://host:port,...` to run the generated readiness flow against several services from one test command.
 
-For native WebSocket routes, add `@websocket` to a GET route in `.api`. `rozectl api generate --update` refreshes route/handler upgrade glue while preserving application-owned frame logic in `src/logic/**`; WebSocket routes are excluded from OpenAPI and normal HTTP SDK output and cannot use idempotency middleware.
+For native WebSocket routes, add `@websocket` to a GET route in `.api`. `rozectl api generate --update` refreshes route/handler upgrade glue while preserving application-owned frame logic in `src/logic/**`; WebSocket routes are excluded from OpenAPI and normal HTTP SDK output and cannot use idempotency middleware. Generated route metadata adds the fully prefixed method-qualified upgrade path to common auth public routes so browser clients can upgrade without an HTTP `Authorization` header; the application WebSocket protocol must authenticate business frames itself.
 
 Generate OpenAPI:
 
@@ -221,6 +230,8 @@ rozectl dev down
 ```
 
 `rozectl dev` defaults to `docker-compose.integration.yml` unless a compose file is supplied.
+
+Generated REST/RPC binaries resolve config from `ROZE_CONFIG_PATH`, then `config.yaml` beside the crate manifest, then working-directory `config.yaml`. Deployment units should set `ROZE_CONFIG_PATH` to the deployment-owned YAML path instead of copying config into the build checkout.
 
 ## Deployment Artifacts
 

@@ -12,6 +12,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Generated RPC service structure with tonic/prost, Roze gRPC routing, managed upstream RPC clients, readiness checks, and Roze context/error metadata
 - `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
 - Generated stream worker scaffolds with Roze MQ/Kafka provider primitives and rustfmt-clean generated Rust glue
+- Native AI runtime and `rozectl ai generate` scaffolds with provider-neutral models, tools, agents, workflow graphs, RAG, teams, streaming, and checkpoints
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
 - Application-owned vs generator-owned file boundaries, including generated logic indexes, preserved `src/logic/prelude.rs`, REST group preludes, and preserved `src/application.rs` hooks
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, rate limiting, cache, MQ, DTM, and search/model helpers
@@ -69,6 +70,7 @@ roze-skills/
     rozectl-workflows.md
     service-patterns.md
     data-search-patterns.md
+    ai-patterns.md
     governance-operations.md
     rust-engineering.md
     troubleshooting.md

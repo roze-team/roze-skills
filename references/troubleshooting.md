@@ -59,6 +59,22 @@ Symptom: production config rejects a field that worked in development.
 
 Generated services use `roze_config::load_service`. Production treats unknown fields and invalid governance/rate-limit ranges as fatal before listeners start, while development/test profiles keep unknown fields warning-only. Fix the field path reported in the error instead of weakening production validation.
 
+Symptom: deployed service loads the wrong `config.yaml`.
+
+Check `ROZE_CONFIG_PATH` first. Generated REST/RPC binaries prefer that path over crate-local and working-directory defaults. Deployment managers should set it to the deployment-owned YAML file.
+
+Symptom: WebSocket upgrade fails with service-level auth enabled.
+
+Regenerate from a checkout that emits fully prefixed WebSocket public routes. The generated HTTP upgrade route is public only for the upgrade handshake; application-owned frame logic must still authenticate the session before accepting business frames.
+
+Symptom: `rozectl ai generate` refuses a target.
+
+Check that the target is an existing generated REST/RPC project with `Cargo.toml`, `src/application.rs`, and `src/svc/mod.rs`. Use `--update` to add workflow/RAG/team later without replacing application-owned `src/ai` files; use `--force` only for a deliberate full scaffold replacement.
+
+Symptom: AI provider config fails or leaks into logs.
+
+Check `ServiceConfig.ai`: `default_provider` must exist, provider names must be non-empty, `max_steps` must be 1..=64, provider URLs must be HTTP(S) without embedded credentials, and timeouts must be non-zero. API keys should use Roze secret references and must not appear in debug output.
+
 ## Validation Issues
 
 Symptom: validator tags do not map to derives.
