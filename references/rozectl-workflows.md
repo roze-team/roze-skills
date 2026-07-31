@@ -192,6 +192,8 @@ Roze currently scopes SDK generation to TypeScript and JavaScript Web clients. D
 
 Generated TypeScript interfaces preserve the complete API type graph independent of declaration order: custom object fields, nested custom objects, arrays such as `[]Type`/`Vec<Type>`, `Option<T>` nullability, JSON field renames, and `validate:"optional"` / `validate:"omitempty"` optional properties should remain typed instead of collapsing to `unknown`. JavaScript clients should carry the same request-building behavior with JSDoc typedefs.
 
+Generated TypeScript and JavaScript clients unwrap successful standard Roze `{ code, msg, data }` envelopes to typed `data`. Non-zero envelope codes raise `RozeApiError` using server `msg`, `trace_id`, and `data`; non-envelope endpoints keep their raw response shape.
+
 For REST routes using `@middleware idempotency`, generated TypeScript clients require `IdempotentRequestOptions` with a reusable `idempotencyKey`; generated JavaScript clients document the same required option through JSDoc. The client forwards that value as `Idempotency-Key`, so callers must reuse it only for retries of the same logical mutation and generate a new value for a different mutation.
 
 Generate Markdown API docs:

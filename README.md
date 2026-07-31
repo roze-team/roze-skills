@@ -16,14 +16,14 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
 - Application-owned vs generator-owned file boundaries, including generated logic indexes, preserved `src/logic/prelude.rs`, REST group preludes, and preserved `src/application.rs` hooks
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, rate limiting, cache, MQ, DTM, and search/model helpers
-- Permission annotations, idempotency middleware, Redis idempotency, distributed memory/Redis rate limiting, persistent SQL outbox, object storage, cache consistency, and read-model query composition
+- Permission annotations, idempotency middleware, Redis standalone/Cluster topology, Redis idempotency, distributed memory/Redis rate limiting, persistent SQL outbox, object storage, cache consistency, and read-model query composition
 - Native WebSocket route generation, Roze WebSocket runtime API, client address extraction, and trusted proxy policy
 - Reporting and chart endpoint contracts backed by Roze report/query primitives and preserved `src/application.rs` data-source hooks
 - `.ent` model source guidance and ent-style query/create/update/delete/projection/aggregate/hook/policy/mixin builders
 - Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
 - Toasty and SeaORM model generation patterns, including explicit `.ent` `RozeShard` database sharding and generated routed model accessors
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
-- Config, strict production config validation, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting, MQ/job governance, cache, DTM, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
+- Config, strict production config validation, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting, MQ/job governance, cache, Redis topology, Qiniu Kodo/S3-compatible storage, DTM, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
 - Roze 1.x stability vs operational evidence guidance
 - Common troubleshooting paths for regeneration, validation, middleware, context, and local dependencies
 

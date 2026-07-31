@@ -55,6 +55,10 @@ Symptom: requests are unexpectedly rate limited or share quota.
 
 Check `governance.rate_limit.key`. Dimensions are composed in declaration order from route, verified client IP, subject, tenant, and configured headers or RPC metadata. With `missing: reject`, absent identity dimensions reject the request; with `missing: omit`, anonymous and authenticated traffic can intentionally share a bucket. For REST `client_ip`, enable `rest.connect_info` and configure trusted proxy CIDRs if forwarded headers are expected.
 
+Symptom: Redis Cluster services see MOVED/ASK or inconsistent cache/idempotency/rate-limit behavior.
+
+Check `cache.cluster_urls` and `governance.rate_limiter.redis_cluster_urls`. Regenerate REST/RPC services from a checkout that passes `cache.cluster_urls` into `RedisCache`, Redis idempotency, and inherited rate-limit config. Avoid module-local Redis clients that bypass `roze-redis`; single-key Lua operations are safe, but new multi-key scripts need one validated hash tag.
+
 Symptom: production config rejects a field that worked in development.
 
 Generated services use `roze_config::load_service`. Production treats unknown fields and invalid governance/rate-limit ranges as fatal before listeners start, while development/test profiles keep unknown fields warning-only. Fix the field path reported in the error instead of weakening production validation.
@@ -131,6 +135,10 @@ Current model generation maps these columns to `rust_decimal::Decimal` and updat
 Symptom: decimal runtime panic or missing dependency feature.
 
 Check generated `Cargo.toml`: Toasty services need `rust_decimal` and Toasty's `rust_decimal` feature; SeaORM services need `rust_decimal` and SeaORM's `with-rust_decimal` feature. Re-run `rozectl model generate` or inspect with `--update` from the fixed checkout before patching dependencies manually.
+
+Symptom: model generation chooses the wrong ORM during update.
+
+Omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold.
 
 Symptom: custom string contains filters behave differently across Toasty/SeaORM.
 

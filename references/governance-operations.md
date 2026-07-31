@@ -102,6 +102,10 @@ Use `roze-local-cache` for in-process Moka-backed cache with TTL, capacity evict
 
 Use `roze-cache` and Redis helpers for distributed cache. Cache-aside loading should use `roze-singleflight` to avoid hot-key miss stampedes.
 
+`roze-redis` owns standalone and Redis Cluster topology. Standalone `cache.url` remains backward compatible; Cluster services configure `cache.cluster_urls`. `roze-cache`, Redis idempotency, and `roze-rate-limit` reuse that topology so MOVED/ASK, slot discovery, and topology refresh stay in the shared Redis client. Generated REST/RPC `ServiceContext` must pass `cache.cluster_urls` to primary cache construction, idempotency, and inherited rate-limit configuration. Existing single-URL services require no change.
+
+Redis Lua operations currently use one key per invocation and are single-slot safe. New multi-key Redis scripts or transactions must use an explicit shared hash tag such as `{tenant-id}` and validate it before execution.
+
 Prefer Roze cache abstractions, singleflight, outbox, object storage, MQ publisher/consumer, DTM helpers, and `roze-query` read-model composition before adding local concurrency, retry, dead-letter, transaction orchestration, media URL, or fan-out query code.
 
 High-frequency in-memory lookup/index paths use concurrent maps/sets where the framework already chose them, including metrics, singleflight, registry, session, WebSocket, eventbus, and MQ stores.
@@ -112,7 +116,7 @@ Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction:
 
 Generated object-storage integration should keep application logic working with object keys and `FileMetadata`. Use `ServiceContext::media_url` / `resolve_media_url` instead of constructing provider URLs by hand; `issue_upload_token` should return normalized keys, expiration, upload policy, and provider presigned requests.
 
-`roze-storage` supports local storage and an S3-compatible runtime adapter with AWS Signature V4, path-style endpoints, `put_object`, `get_object`, `delete_object`, `stat_object`, and bounded signed PUT/GET URLs. Tenant prefixes, upload validation, metadata, ETags, and endpoint ports in the canonical `Host` header are framework-owned behavior. Qiniu Kodo, Aliyun OSS, and Tencent COS remain provider-SDK boundaries; their mutation methods should fail closed until provider-specific signing exists. Real MinIO/S3 evidence requires the ignored round-trip test with `ROZE_TEST_S3_ENDPOINT`.
+`roze-storage` supports local storage and an S3-compatible runtime adapter with AWS Signature V4, path-style endpoints, `put_object`, `get_object`, `delete_object`, `stat_object`, and bounded signed PUT/GET URLs. Qiniu Kodo reuses the same SigV4 runtime through its official S3-compatible endpoint, region ID, S3 bucket name, and AK/SK. Tenant prefixes, upload validation, metadata, ETags, and endpoint ports in the canonical `Host` header are framework-owned behavior. Aliyun OSS and Tencent COS remain provider-SDK boundaries and their mutation methods should fail closed until dedicated signing exists. Real MinIO/S3 evidence requires the ignored round-trip test with `ROZE_TEST_S3_ENDPOINT`; real Kodo evidence is credential-gated and must never print AK/SK.
 
 Generated model repositories use versioned cache keys via `roze_cache::model_cache_key`, and create/update/delete/soft-delete paths should invalidate every configured lookup key after a successful database write. Use `InvalidationPlan` for writes outside generated repositories. For bounded-staleness read models, use `get_or_load_consistent_option` with `CacheConsistencyPolicy` so stale-on-error cannot outlive the hard TTL window.
 

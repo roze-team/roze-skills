@@ -52,6 +52,8 @@ Generate SeaORM-style modules instead:
 rozectl model generate example/user.sql --out services/user-api --format sql --orm sea-orm
 ```
 
+On `--update`, omit `--orm` to inherit the generated ORM marker from `src/model/mod.rs`. Legacy projects can be inferred from an unambiguous `Cargo.toml` dependency. If the ORM cannot be determined, generation must stop and require explicit `--orm`. Switching an existing model scaffold between Toasty and SeaORM requires both `--orm <target>` and `--switch-orm`; review the generated file/dependency diff and preserve `src/model/*_ext.rs`.
+
 Generated REST/API services do not depend on database crates by default. Add models only when the application needs persistence.
 
 ## Entity Schema Source
