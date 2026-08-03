@@ -92,6 +92,10 @@ Generated Toasty repositories should support the stable Roze model contract wher
 
 Generated SeaORM output should expose the same practical repository surface where possible.
 
+SeaORM query builders use replicas by default. Use `.primary()` or `.read_from(roze_orm::ReadSource::Primary)` for authorization checks, read-before-write decisions, optimistic locking, state transitions, and any read whose freshness controls a mutation. Keep observability labels bounded through `ReadSource::label()`, which returns only `primary` or `replica`.
+
+For conditional mutations, use the generated `update_where()` builder and finish with `execute()`. It emits one SQL `UPDATE` and returns SeaORM `UpdateResult`; treat `rows_affected == 0` as the optimistic-lock or state-precondition signal and return `RozeError::FailedPrecondition` where that is the domain meaning.
+
 Projection helpers should apply predicates before projection. For nullable fields, preserve nullability in return types; for example, a nullable string field can produce `Vec<Option<String>>` for `pluck_<field>` and `Option<Option<String>>` for `first_<field>`.
 
 Roze tracks practical ent parity by generated API, runtime semantics, regeneration behavior, and backend evidence. Prefer the wording "ent-style generated model API" unless the active checkout's parity matrix and `scripts/model-parity-gate.sh` support stronger claims. In-scope parity includes fields/indexes/defaults, custom/composite IDs, ordinary/inverse/Through edges, predicates, `HasX`/`HasXWith`, ordering/pagination/projection/aggregation, create/update/delete, eager loading, hooks/interceptors, privacy/policy, mixins, migrations, and generator extensions.

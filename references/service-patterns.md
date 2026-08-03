@@ -12,6 +12,7 @@ Cargo.toml
 src/
   main.rs
   application.rs
+  application_config.rs
   config/mod.rs
   route/
   handler/
@@ -29,6 +30,7 @@ Ownership rules:
 - `src/logic/<group>/prelude.rs` is application-owned REST group-local prelude when generated.
 - `src/logic/mod.rs` and REST `src/logic/<group>/mod.rs` are generated indexes and are refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
+- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section.
 - `src/handler/**` is generator-owned HTTP adaptation: parse request, extract context, call logic, wrap response.
 - `src/route/**` is generator-owned route registration.
 - `src/types/mod.rs` is generated DTO code from `.api`.
@@ -86,6 +88,7 @@ proto/service.proto
 src/
   main.rs
   application.rs
+  application_config.rs
   client/mod.rs
   config/mod.rs
   pb/mod.rs
@@ -101,12 +104,13 @@ Ownership rules:
 - `src/logic/prelude.rs` is application-owned shared logic prelude for declarations, imports, attributes, and re-exports that generated RPC logic modules include.
 - `src/logic/mod.rs` is a generated index and is refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
+- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section.
 - `src/server/mod.rs` is generator-owned tonic server adaptation.
 - `src/client/mod.rs` is generator-owned client code.
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
 - `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`.
 
-RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, request id, trace id, and locale.
+RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, request id, trace id, and locale. `RozeError::Conflict` maps to gRPC `AlreadyExists`, while `RozeError::FailedPrecondition` maps to `FailedPrecondition`; both round-trip through Roze error-kind metadata.
 
 Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 

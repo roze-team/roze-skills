@@ -19,6 +19,7 @@ Prefer `--update`, not `--force`. Confirm the file is application-owned:
 - REST logic: `src/logic/**.rs`
 - REST/RPC shared logic prelude: `src/logic/prelude.rs`
 - REST group logic prelude: `src/logic/<group>/prelude.rs`
+- REST/RPC typed application config: `src/application_config.rs`
 - RPC logic: `src/logic/*.rs`
 - custom REST middleware: `src/middleware/*.rs`
 - config: `config.yaml`
@@ -61,7 +62,11 @@ Check `cache.cluster_urls` and `governance.rate_limiter.redis_cluster_urls`. Reg
 
 Symptom: production config rejects a field that worked in development.
 
-Generated services use `roze_config::load_service`. Production treats unknown fields and invalid governance/rate-limit ranges as fatal before listeners start, while development/test profiles keep unknown fields warning-only. Fix the field path reported in the error instead of weakening production validation.
+Generated services use `roze_config::load_service_with_application` with `ServiceConfigWithApplication<ApplicationConfig>`. Production treats unknown built-in or typed `application` fields and invalid governance/rate-limit ranges as fatal before listeners start, while development/test profiles keep unknown fields warning-only. Fix the field path reported in the error instead of weakening production validation.
+
+Symptom: typed application config does not load or appears in debug logs.
+
+Regenerate from the current checkout and keep application fields in preserved `src/application_config.rs`. Generated `src/config/mod.rs` must call `load_service_with_application`; application secrets should use normal Roze secret references, and `ServiceConfigWithApplication` redacts the complete application value from `Debug`.
 
 Symptom: deployed service loads the wrong `config.yaml`.
 
@@ -98,6 +103,10 @@ Check the entry middleware/adapter. REST/RPC/gateway/MQ entry points should rest
 Symptom: RPC errors lack metadata.
 
 Ensure server adapters convert errors through `roze_rpc::rpc::status_from_error(err, &request_ctx)`. Standard metadata includes Roze error code, error kind, request id, trace id, and locale.
+
+Symptom: conflict or stale-version errors change meaning across REST and RPC.
+
+Return `RozeError::Conflict` or `RozeError::FailedPrecondition` from logic. Roze maps them to HTTP 409/412 and gRPC `AlreadyExists`/`FailedPrecondition`, then reconstructs them from error-kind metadata on RPC clients.
 
 ## Local Dependency Issues
 
@@ -143,6 +152,14 @@ Omit `--orm` to inherit the existing generated marker when it is present. For le
 Symptom: custom string contains filters behave differently across Toasty/SeaORM.
 
 Generated ent-style predicates include `contains`/`icontains` helpers and escape LIKE patterns. For advanced search semantics, keep custom query orchestration in `src/model/*_ext.rs` or application modules until the active Roze checkout documents a richer stable predicate API.
+
+Symptom: a SeaORM read immediately before a write observes stale data.
+
+Generated SeaORM queries read from replicas by default. Use `.primary()` or `.read_from(roze_orm::ReadSource::Primary)` for authorization, read-before-write, optimistic-lock, and state-transition decisions; transaction-scoped clients remain pinned to their transaction.
+
+Symptom: optimistic locking performs a read and write but still races.
+
+Use generated `update_where()` with the version or expected-state predicate and call `execute()`. Check `UpdateResult.rows_affected`; zero rows means the condition no longer holds and should normally become `RozeError::FailedPrecondition`.
 
 Symptom: ent-style projection helper is missing after regeneration.
 

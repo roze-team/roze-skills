@@ -4,9 +4,9 @@ Use this reference for production behavior across config, middleware, registry, 
 
 ## Configuration
 
-Applications should use `roze-config::ServiceConfig`. Local files default to `config.yaml`; environment variables and config center values are overrides or hot-update sources.
+Applications should use `roze-config::ServiceConfig`. Generated REST/RPC services wrap it in `ServiceConfigWithApplication<ApplicationConfig>` and load the preserved typed top-level `application` section through `load_service_with_application`. Local files default to `config.yaml`; environment variables and config center values are overrides or hot-update sources.
 
-Prefer Roze config loading, environment override, config center, typed service config, strict service validation, and hot-reload hooks before introducing application-local config systems.
+Prefer Roze config loading, environment override, config center, typed service and application config, strict service validation, and hot-reload hooks before introducing application-local config systems. Application values receive normal Roze secret resolution, the whole typed payload is redacted from `Debug`, and production rejects unknown fields against both built-in and application schemas before binding listeners.
 
 Use built-in secret references for sensitive configuration: `env://NAME`, `${NAME}`, and `file://path`. Relative secret files resolve beside the primary config file, trailing line endings are removed, and `load_with_secret_provider` supports custom providers. JWT key IDs must be unique, resolved HMAC secrets must be at least 32 bytes, and startup fails before listeners are created when secret resolution or validation fails. Debug output must identify references or key IDs only, never secret material.
 
@@ -38,7 +38,7 @@ REST, RPC, gateway, MQ, and job entry points should propagate standard Roze cont
 
 If request id or trace id is missing, the entry point should generate and return it where the protocol supports headers/metadata.
 
-HTTP errors use `RozeError` and `roze-result::ApiResponse`. RPC errors use `roze_rpc::rpc::status_from_error`.
+HTTP errors use `RozeError` and `roze-result::ApiResponse`. Use `RozeError::Conflict` for HTTP 409 and `RozeError::FailedPrecondition` for HTTP 412 instead of collapsing domain concurrency failures into bad requests or internal errors. RPC errors use `roze_rpc::rpc::status_from_error`, mapping these variants to `AlreadyExists` and `FailedPrecondition` with stable Roze metadata.
 
 Prefer Roze context, error, result, tracing, and metrics helpers at every protocol boundary. Do not invent parallel request-id, trace-id, locale, tenant, response-envelope, or error-code conventions inside one service.
 
