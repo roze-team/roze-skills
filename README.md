@@ -6,22 +6,22 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 
 ## What This Skill Covers
 
-- `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows
+- `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows, including partial-workspace dependency normalization
 - Roze `.api` and `.proto` contract-first development
 - Generated REST service structure with Roze native HTTP, Tower, Roze middleware, typed application configuration, and semantic Roze errors
 - Generated RPC service structure with tonic/prost, Roze gRPC routing, managed upstream RPC clients, readiness checks, typed application configuration, and Roze context/error metadata
 - `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
-- Generated stream worker scaffolds with Roze MQ/Kafka provider primitives and rustfmt-clean generated Rust glue
+- Generated stream worker scaffolds with Roze MQ/Kafka provider primitives, native-Windows `rdkafka-cmake` builds, and rustfmt-clean generated Rust glue
 - Native AI runtime and `rozectl ai generate` scaffolds with provider-neutral models, tools, agents, workflow graphs, RAG, teams, streaming, and checkpoints
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
-- Application-owned vs generator-owned file boundaries, including generated logic indexes, preserved `src/logic/prelude.rs`, REST group preludes, `src/application_config.rs`, and preserved `src/application.rs` hooks
+- Application-owned vs generator-owned file boundaries, including generated logic indexes, preserved `src/logic/prelude.rs`, REST group preludes, legacy config-loader migration, `src/application_config.rs`, and preserved `src/application.rs` hooks
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, rate limiting, cache, MQ, DTM, and search/model helpers
-- Permission annotations, idempotency middleware, Redis standalone/Cluster topology, Redis idempotency, distributed memory/Redis rate limiting, persistent SQL outbox, object storage, cache consistency, and read-model query composition
+- Permission annotations, idempotency middleware, Redis standalone/Cluster topology, Redis idempotency, distributed memory/Redis rate limiting, SeaORM/Toasty transactional SQL outbox, object storage, cache consistency, and read-model query composition
 - Native WebSocket route generation, Roze WebSocket runtime API, client address extraction, and trusted proxy policy
 - Reporting and chart endpoint contracts backed by Roze report/query primitives and preserved `src/application.rs` data-source hooks
 - `.ent` model source guidance and ent-style query/create/update/delete/conditional-update/projection/aggregate/hook/policy/mixin builders
 - Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
-- Toasty and SeaORM model generation patterns, including SeaORM primary/replica read selection, `update_where()` optimistic locking, explicit `.ent` `RozeShard` database sharding, and generated routed model accessors
+- Toasty and SeaORM model generation patterns, including direct `serde` derive dependencies, workspace-aware manifests, SeaORM primary/replica read selection, `update_where()` optimistic locking, explicit `.ent` `RozeShard` database sharding, and generated routed model accessors
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns
 - Config, typed top-level application config, strict production config validation, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting, MQ/job governance, cache, Redis topology, Qiniu Kodo/S3-compatible storage, DTM, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
 - Roze 1.x stability vs operational evidence guidance

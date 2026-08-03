@@ -68,6 +68,10 @@ Symptom: typed application config does not load or appears in debug logs.
 
 Regenerate from the current checkout and keep application fields in preserved `src/application_config.rs`. Generated `src/config/mod.rs` must call `load_service_with_application`; application secrets should use normal Roze secret references, and `ServiceConfigWithApplication` redacts the complete application value from `Debug`.
 
+Symptom: `--update` warns that a custom config loader needs manual migration.
+
+Only exact historical generated loaders are migrated automatically. Preserve the custom code, then manually adapt it to `ServiceConfigWithApplication<application_config::ApplicationConfig>` and `load_service_with_application`. Current generated `src/config/mod.rs` owns `application_config` through a path module so extra binary targets should reuse `config` instead of redeclaring the application module.
+
 Symptom: deployed service loads the wrong `config.yaml`.
 
 Check `ROZE_CONFIG_PATH` first. Generated REST/RPC binaries prefer that path over crate-local and working-directory defaults. Deployment managers should set it to the deployment-owned YAML file.
@@ -144,6 +148,14 @@ Current model generation maps these columns to `rust_decimal::Decimal` and updat
 Symptom: decimal runtime panic or missing dependency feature.
 
 Check generated `Cargo.toml`: Toasty services need `rust_decimal` and Toasty's `rust_decimal` feature; SeaORM services need `rust_decimal` and SeaORM's `with-rust_decimal` feature. Re-run `rozectl model generate` or inspect with `--update` from the fixed checkout before patching dependencies manually.
+
+Symptom: standalone generated model code cannot import `serde` derives, or a partial workspace reports an inherited dependency is missing.
+
+Regenerate with the current `rozectl`. Toasty and SeaORM model manifests require direct `serde` with `derive`; `workspace = true` is valid only when that dependency name exists in the parent `[workspace.dependencies]`. Missing parent entries should be normalized to explicit versions on generation and repeated update.
+
+Symptom: Toasty transactional outbox enqueue fails before SQL.
+
+Pass a PostgreSQL/MySQL `toasty::Transaction` to `SqlOutboxStore::enqueue_in_transaction`. Non-SQL Toasty drivers and a mismatch between the Toasty SQL placeholder dialect and configured outbox backend are rejected intentionally.
 
 Symptom: model generation chooses the wrong ORM during update.
 

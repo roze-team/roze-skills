@@ -56,6 +56,8 @@ On `--update`, omit `--orm` to inherit the generated ORM marker from `src/model/
 
 Generated REST/API services do not depend on database crates by default. Add models only when the application needs persistence.
 
+Standalone Toasty and SeaORM model generation must declare direct `serde` with the `derive` feature because generated model structs derive `Serialize` and `Deserialize`. In a parent workspace, generated dependencies use `workspace = true` only for names actually present in `[workspace.dependencies]`; otherwise `rozectl` writes explicit compatible versions. Repeated `--update` runs should keep the normalized manifest byte-stable.
+
 ## Entity Schema Source
 
 Current Roze model generation first writes or reads `src/model/schema.ent`, then generates Rust model code from that `.ent` schema. SQL DDL, Roze model DSL, and database inspection are import paths into `.ent`; `.ent` is the model codegen source.

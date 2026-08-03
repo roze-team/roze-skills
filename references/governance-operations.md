@@ -112,7 +112,7 @@ High-frequency in-memory lookup/index paths use concurrent maps/sets where the f
 
 Reliable event publishing should prefer outbox relay and publish through a `roze_mq::Publisher`.
 
-Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. `roze-transaction-sql` is the official PostgreSQL/MySQL `OutboxStore` and `TransactionalOutbox<sea_orm::DatabaseTransaction>` adapter; generated `outbox.store: auto` selects SQL when `database.url` is configured, and production rejects an enabled memory store. Use bundled migrations or an approved migration flow, then rely on `relay_outbox_batch` for claim, lease recovery, retry, dead-letter, replay, cleanup, and `roze_outbox_events_total` metrics.
+Generated REST/RPC `ServiceContext` values can expose `Arc<dyn roze_transaction::OutboxStore>`. The default in-memory outbox is for local development and tests. `roze-transaction-sql` is the official PostgreSQL/MySQL `OutboxStore` and implements `TransactionalOutbox` for both `sea_orm::DatabaseTransaction` and `toasty::Transaction`; both adapters use the same schema and idempotency rules. Toasty rejects non-SQL drivers and backend/dialect mismatches before insert. Generated `outbox.store: auto` selects SQL when `database.url` is configured, and production rejects an enabled memory store. Use bundled migrations or an approved migration flow, then rely on `relay_outbox_batch`, which accepts concrete or dynamically dispatched `roze_mq::Publisher` values, for claim, lease recovery, retry, dead-letter, replay, cleanup, and `roze_outbox_events_total` metrics.
 
 Generated object-storage integration should keep application logic working with object keys and `FileMetadata`. Use `ServiceContext::media_url` / `resolve_media_url` instead of constructing provider URLs by hand; `issue_upload_token` should return normalized keys, expiration, upload policy, and provider presigned requests.
 
@@ -122,7 +122,7 @@ Generated model repositories use versioned cache keys via `roze_cache::model_cac
 
 Use `roze-query::QueryComposer` for read-model fan-out. Configure total request budget, per-upstream timeout, max fan-out, concurrency, and strict vs partial failure behavior instead of hand-rolling joins across downstream calls.
 
-MQ consumers must make ack/nack, retry, dead letter, and idempotency behavior explicit. Kafka should be constructed through `roze_kafka::build_runtime` or generated stream workers so business code depends only on `roze_mq::{Publisher, Subscriber}`. Use provider `rdkafka` for production consumers; `rdkafka-cmake` is the Windows-friendly production build path, `memory` is for development/testing, and `rust-native`/rskafka is experimental publish-only because it lacks consumer groups and offset commit semantics.
+MQ consumers must make ack/nack, retry, dead letter, and idempotency behavior explicit. Kafka should be constructed through `roze_kafka::build_runtime` or generated stream workers so business code depends only on `roze_mq::{Publisher, Subscriber}`. Use provider `rdkafka` for production consumers; `rozectl stream gen --broker rdkafka-cmake` selects the Windows-friendly bundled build while retaining runtime provider `rdkafka`. `memory` is for development/testing, and `rust-native`/rskafka is experimental publish-only because it lacks consumer groups and offset commit semantics.
 
 DTM defaults to TCC. Saga is optional and should not weaken the default TCC state machine.
 

@@ -37,7 +37,10 @@ Generate a stream worker scaffold from event-capable RPC/API contracts:
 ```bash
 cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --roze-source path
 cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --broker rdkafka --roze-source path
+cargo run -p rozectl -- stream gen example/events.api --out apps/events-worker --broker rdkafka-cmake --roze-source path
 ```
+
+`rdkafka-cmake` enables the bundled CMake build for native Windows hosts but still writes runtime `kafka.provider: rdkafka`; it is a Cargo build feature, not a separate runtime provider. The build host needs CMake and a compatible C/C++ toolchain.
 
 Generate an AI module inside an existing generated REST/RPC project:
 
@@ -57,23 +60,25 @@ Use `--update` for normal regeneration. It preserves:
 - REST `src/logic/<group>/<method>.rs`
 - REST/RPC `src/logic/prelude.rs`
 - REST `src/logic/<group>/prelude.rs`
-- REST `src/config/mod.rs`
+- REST `src/config/mod.rs`, except exact recognized legacy loader migration
 - REST `src/handler/<group>/<method>.rs`
 - REST/RPC `src/application.rs`
 - REST/RPC `src/application_config.rs`
 - REST custom middleware files under `src/middleware/<name>.rs`
-- RPC `src/config/mod.rs`
+- RPC `src/config/mod.rs`, except exact recognized legacy loader migration
 - RPC `src/logic/<method>.rs`
 - `config.yaml`
 - model extension files `src/model/*_ext.rs`
 
 Generated glue such as route registration, handler indexes, generated logic indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, `proto/service.proto`, and REST/RPC `src/svc/mod.rs` is refreshed. Do not put custom fields, initialization, methods, or business workflows in `src/svc/mod.rs`; move them to preserved `src/application.rs` hooks before upgrading. Put shared custom logic module declarations, imports, attributes, and re-exports in preserved `src/logic/prelude.rs`; put REST group-local declarations in `src/logic/<group>/prelude.rs`. RPC `--update` removes stale generated logic declarations from `src/logic/mod.rs`, so do not rely on that generated index for custom module declarations. On the first update of legacy projects, `rozectl` can transactionally append a missing default `register_services` hook and migrate resolvable custom `mod` plus related `use` declarations from old generated logic indexes into the matching prelude; the migration runs in the staging project and repeated updates preserve the migrated files. If a service uses generated models, run model generation after REST/RPC regeneration so model-specific context wiring is re-applied to the refreshed service context.
 
-Keep application-specific configuration fields in preserved `src/application_config.rs`. Generated `src/config/mod.rs` should continue loading `ServiceConfigWithApplication<crate::application_config::ApplicationConfig>` through `load_service_with_application`; do not replace that generated loader with an ad hoc config path during updates.
+Keep application-specific configuration fields in preserved `src/application_config.rs`. Current generated `src/config/mod.rs` owns that module through `#[path = "../application_config.rs"]`, exposes `ServiceConfigWithApplication<application_config::ApplicationConfig>`, and calls `load_service_with_application`. This lets extra binary targets reuse the config module without declaring a duplicate root module.
+
+During `--update`, `rozectl` migrates only exact historical generated config loaders using `roze_config::load`, `load_service`, or the first root-level typed loader. An unrecognized custom `src/config/mod.rs` is preserved and emits an actionable manual-migration warning; do not silence that warning by overwriting custom config code.
 
 Use `--force` only for a deliberate full rebuild.
 
-API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Stream targets excluded by a parent Cargo workspace receive standalone package metadata, explicit dependency versions, an empty local `[workspace]` boundary, and are not added to the parent workspace members; this manifest shape should remain stable across repeated updates. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
+API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Generated REST/RPC/model manifests use `workspace = true` only when the dependency actually exists in the parent `[workspace.dependencies]`; missing entries fall back to explicit versions and remain deterministic across repeated updates. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project; update mode does not rewrite the application-owned consumer or config. Stream targets excluded by a parent Cargo workspace receive standalone package metadata, explicit dependency versions, an empty local `[workspace]` boundary, and are not added to the parent workspace members; this manifest shape should remain stable across repeated updates. Parse, extension, dependency-resolution, or formatting failures should leave the existing project unchanged.
 
 AI generation is also transactional and independent from API/RPC/model/search/stream generation. `src/ai/mod.rs` and `src/ai/generated.rs` are framework-owned; `src/ai/agent.rs`, `src/ai/tools.rs`, `src/ai/prompts/**`, optional `workflow.rs`, `rag.rs`, and `team.rs` are application-owned and preserved by `--update`. `--force` replaces the complete AI scaffold intentionally.
 

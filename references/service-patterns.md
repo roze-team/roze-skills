@@ -30,7 +30,7 @@ Ownership rules:
 - `src/logic/<group>/prelude.rs` is application-owned REST group-local prelude when generated.
 - `src/logic/mod.rs` and REST `src/logic/<group>/mod.rs` are generated indexes and are refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
-- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section.
+- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section. Current generated `src/config/mod.rs` owns it as a path module and re-exports it through the generated binary root, so additional binaries should import the config module instead of declaring `application_config` again.
 - `src/handler/**` is generator-owned HTTP adaptation: parse request, extract context, call logic, wrap response.
 - `src/route/**` is generator-owned route registration.
 - `src/types/mod.rs` is generated DTO code from `.api`.
@@ -104,7 +104,7 @@ Ownership rules:
 - `src/logic/prelude.rs` is application-owned shared logic prelude for declarations, imports, attributes, and re-exports that generated RPC logic modules include.
 - `src/logic/mod.rs` is a generated index and is refreshed by `--update`.
 - `src/application.rs` is the preserved async service-context configuration hook.
-- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section.
+- `src/application_config.rs` is the preserved typed declaration for the top-level `application` config section. Current generated `src/config/mod.rs` owns it as a path module and re-exports it through the generated binary root, so additional binaries should import the config module instead of declaring `application_config` again.
 - `src/server/mod.rs` is generator-owned tonic server adaptation.
 - `src/client/mod.rs` is generator-owned client code.
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
