@@ -44,17 +44,25 @@ Symptom: request timeouts behave differently than expected.
 
 Check `rest.middlewares.timeout` and route governance overrides. `timeout: true` lets generated route glue enforce service-wide `governance.timeout_ms` and route-specific timeout overrides. `timeout: false` can still propagate timeout metadata without cancelling logic in the HTTP adapter.
 
+Symptom: JSON/form extraction rejects a body below the configured service limit, or gzip payloads exceed the intended limit after decompression.
+
+Regenerate with the current `rozectl`. `rest.middlewares.request_body_limit_bytes` must replace the native extractor's 2 MiB limit, and gunzip must run before decompressed-size enforcement. When the setting is absent, the native 2 MiB extractor default still applies.
+
 Symptom: generated REST code imports Axum types.
 
 Check whether the service was generated from an older Roze checkout. Current generated REST code should use Roze native HTTP APIs such as `roze_http::Router`, extractors, responses, body helpers, and Tower-compatible middleware. Regenerate with the current `rozectl` and keep any custom HTTP behavior in application-owned logic or middleware.
 
 Symptom: production service refuses to start when rate limiting is enabled.
 
-Check `governance.rate_limiter`. Production requires Redis-backed rate limiting through explicit `governance.rate_limiter.redis_url` or `cache.url`; `store: auto` may use memory only outside production. Also check positive `timeout_ms`, valid key dimensions, non-duplicate headers, and a non-empty namespace.
+Check `governance.rate_limiter`. Production requires Redis-backed rate limiting through explicit `governance.rate_limiter.redis_url` or `cache.url`; `store: auto` may use memory only outside production. Also check positive `timeout_ms`, `burst`, `refill_ms`, and `tokens_per_refill`, non-overflowing refill arithmetic, valid key dimensions, non-duplicate headers, and a non-empty namespace.
 
 Symptom: requests are unexpectedly rate limited or share quota.
 
 Check `governance.rate_limit.key`. Dimensions are composed in declaration order from route, verified client IP, subject, tenant, and configured headers or RPC metadata. With `missing: reject`, absent identity dimensions reject the request; with `missing: omit`, anonymous and authenticated traffic can intentionally share a bucket. For REST `client_ip`, enable `rest.connect_info` and configure trusted proxy CIDRs if forwarded headers are expected.
+
+Symptom: application logic cannot read the verified REST client IP from Roze context.
+
+Regenerate REST/WebSocket handlers from the current checkout. With `rest.connect_info: true`, generated handlers place the policy-resolved address in request metadata as `client_ip` before rate limiting and logic. Do not copy untrusted forwarded headers directly.
 
 Symptom: Redis Cluster services see MOVED/ASK or inconsistent cache/idempotency/rate-limit behavior.
 
@@ -108,6 +116,10 @@ Symptom: RPC errors lack metadata.
 
 Ensure server adapters convert errors through `roze_rpc::rpc::status_from_error(err, &request_ctx)`. Standard metadata includes Roze error code, error kind, request id, trace id, and locale.
 
+Symptom: a string business code becomes numeric or its HTTP status changes after RPC.
+
+Return `RozeError::coded` and keep conversion through Roze RPC helpers. Current metadata carries `x-roze-error-code` and `x-roze-http-status`; coded 429 errors also preserve retry delay. Legacy `ApiResponse` remains numeric, so use `CodedApiResponse` explicitly when the success envelope requires `"code": "OK"`.
+
 Symptom: conflict or stale-version errors change meaning across REST and RPC.
 
 Return `RozeError::Conflict` or `RozeError::FailedPrecondition` from logic. Roze maps them to HTTP 409/412 and gRPC `AlreadyExists`/`FailedPrecondition`, then reconstructs them from error-kind metadata on RPC clients.
@@ -159,7 +171,11 @@ Pass a PostgreSQL/MySQL `toasty::Transaction` to `SqlOutboxStore::enqueue_in_tra
 
 Symptom: model generation chooses the wrong ORM during update.
 
-Omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold.
+SeaORM is the default only for new model scaffolds. On update, omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold.
+
+Symptom: Stream `--update` removes a dependency used only by the preserved consumer.
+
+Regenerate with the current `rozectl`. Stream updates must merge generator-managed dependencies while preserving application-added dependencies and unrelated Cargo sections. Invalid application manifest syntax should fail transactionally without replacing the project.
 
 Symptom: custom string contains filters behave differently across Toasty/SeaORM.
 
@@ -168,6 +184,10 @@ Generated ent-style predicates include `contains`/`icontains` helpers and escape
 Symptom: a SeaORM read immediately before a write observes stale data.
 
 Generated SeaORM queries read from replicas by default. Use `.primary()` or `.read_from(roze_orm::ReadSource::Primary)` for authorization, read-before-write, optimistic-lock, and state-transition decisions; transaction-scoped clients remain pinned to their transaction.
+
+Symptom: a multi-repository SeaORM transaction reads from a replica or invalidates cache before commit.
+
+Use `ctx.model().transaction(...)`, or `transaction_for_key` for one sharded key. Repositories from that scoped client force all sources to the primary transaction, bypass cached reads, and flush pending invalidations only after commit; rollback discards them.
 
 Symptom: optimistic locking performs a read and write but still races.
 

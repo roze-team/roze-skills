@@ -40,7 +40,7 @@ Ownership rules:
 - `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`; do not place custom resources or business workflows there.
 - `config.yaml` is local/deployment config and is preserved by `--update`.
 
-REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. HTTP errors should use Roze error types and helpers instead of custom JSON.
+REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. Existing numeric envelopes keep success `code: 0`. APIs that require bounded string business codes can opt into `CodedApiResponse::ok(data)` or `CodedApiResponse::success(...)`; wrap them with HTTP 201/202 when appropriate, and use HTTP 204 directly for an empty body. HTTP errors should use Roze error types and helpers instead of custom JSON.
 
 Prefer generated REST adapters and Roze HTTP helpers for routing, request extraction, response wrapping, validation, timeout metadata, context propagation, WebSocket upgrades, client address extraction, middleware ordering, health, metrics, and OpenAPI exposure. Add custom Tower layers only after confirming the generated middleware/config surface cannot express the behavior.
 
@@ -74,7 +74,7 @@ Generated REST and RPC entrypoints call `src/application.rs::register_services(&
 
 Annotate a GET route with `@websocket` to generate a native Roze WebSocket endpoint. Generated handler and route glue use `roze_http::ws::WebSocketUpgrade`; application-owned frame handling lives under `src/logic/**` and is preserved by `--update`. WebSocket routes use `EmptyReq`/`EmptyResp`, cannot use idempotency middleware, and are excluded from OpenAPI and normal HTTP SDK generation. Generated fully prefixed upgrade routes are added to `auth_public_routes`; this exempts only the HTTP upgrade, so application-owned WebSocket logic must reject business frames until its protocol authentication succeeds. Use `roze_http::ws::{WebSocket, Message, CloseFrame, WebSocketConfig}` instead of depending on Hyper upgrade internals.
 
-When `rest.connect_info: true`, generated entrypoints use `RestServer::with_connect_info()` so handlers and middleware can extract `ConnectInfo<SocketAddr>` and policy-resolved `roze_http::client_ip::ClientIp`. Forwarded headers are ignored unless the direct peer matches `rest.middlewares.trusted_proxy_cidrs`; configuring trusted proxy CIDRs without connect info is a startup error.
+When `rest.connect_info: true`, generated entrypoints use `RestServer::with_connect_info()` so handlers and middleware can extract `ConnectInfo<SocketAddr>` and policy-resolved `roze_http::client_ip::ClientIp`. Generated REST and WebSocket handlers copy the verified value into request-context metadata as `client_ip` before rate limiting and application logic. Forwarded headers are ignored unless the direct peer matches `rest.middlewares.trusted_proxy_cidrs`; configuring trusted proxy CIDRs without connect info is a startup error.
 
 ## RPC Layout
 
@@ -110,7 +110,7 @@ Ownership rules:
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
 - `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`.
 
-RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, request id, trace id, and locale. `RozeError::Conflict` maps to gRPC `AlreadyExists`, while `RozeError::FailedPrecondition` maps to `FailedPrecondition`; both round-trip through Roze error-kind metadata.
+RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, exact HTTP status for coded errors, request id, trace id, locale, and retry delay. `RozeError::Conflict` maps to gRPC `AlreadyExists`, while `RozeError::FailedPrecondition` maps to `FailedPrecondition`; both round-trip through Roze error-kind metadata. `RozeError::coded(status, code, message)` preserves its bounded string code and HTTP status through `x-roze-error-code` and `x-roze-http-status`; use `coded_rate_limited` when HTTP 429 must also preserve `Retry-After`.
 
 Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 
@@ -132,7 +132,7 @@ The manual `Cargo.toml` plus `rpc_clients.<name>` flow remains available for pro
 
 Generated RPC clients pass the inbound `roze_context::Context` into Roze's shared retry executor. Retryable failures use exponential full-jitter backoff, service/method retry budgets, remaining-deadline checks before sleeping, and cancellation checks before and after sleep. Request-level retry budget propagates as `x-roze-retry-budget-remaining`; if absent, the first governed RPC client initializes it from effective `max_attempts - 1` capped at 64. Context clones/forks share one atomic budget, concurrent downstream calls receive at most half the currently available credits, and unused child credits may be restored only up to the delegated amount. `roze_resilience_decisions_total` records `attempt` only immediately before a real retry call; budget, request-budget, deadline, and cancellation exhaustion use bounded decisions such as `budget_exhausted`, `request_budget_exhausted`, `deadline_exhausted`, and `cancelled`.
 
-REST and RPC route/method rate limiting uses the generated `Arc<roze_rate_limit::RateLimiter>` from `ServiceContext`, not process-local ad hoc counters. REST rejections return HTTP `429` with integer `Retry-After`; RPC rejections use gRPC `ResourceExhausted` with `retry-after` metadata. Redis-backed stores are registered in readiness as `rate-limit:redis`; production services with rate limiting enabled must not fall back to memory.
+REST and RPC route/method rate limiting uses the generated `Arc<roze_rate_limit::RateLimiter>` from `ServiceContext`, not process-local ad hoc counters. The sustained rate is `tokens_per_refill / refill_ms`; `tokens_per_refill` defaults to 1 and supports high rates without sub-millisecond windows. REST rejections return HTTP `429` with integer `Retry-After`; RPC rejections use gRPC `ResourceExhausted` with `retry-after` metadata. Redis-backed stores are registered in readiness as `rate-limit:redis`; production services with rate limiting enabled must not fall back to memory.
 
 Generated AI modules attach `Arc<roze_ai::AiRuntime>` through existing application extension hooks. Keep AI runtime access behind `application::ai::runtime(&ctx)` and pass inbound `&roze_context::Context` through model, tool, graph, RAG, and team calls so permissions, deadlines, cancellation, tenant, trace, and request IDs stay uniform.
 
@@ -215,7 +215,7 @@ Cross-field comparisons should be generated only when both fields map to the sam
 
 ## Middleware
 
-Service-wide REST middleware lives under `rest.middlewares` in `config.yaml`. Built-ins include recover, trace, stat, prometheus, cors, timeout, max connections, shedding, gunzip, request context, auth, and request body limits. Request body limits must enforce the actual decompressed body size before extraction, including requests without `Content-Length`, and return `413` without losing the accepted body for JSON/Form/custom extractors.
+Service-wide REST middleware lives under `rest.middlewares` in `config.yaml`. Built-ins include recover, trace, stat, prometheus, cors, timeout, max connections, shedding, gunzip, request context, auth, and request body limits. When configured, `request_body_limit_bytes` replaces the native extractor's 2 MiB default and enforces the actual decompressed body size before extraction, including requests without `Content-Length`; optional gunzip runs first. Oversized bodies return `413`, while accepted JSON/Form/raw/custom extraction reuses shared body bytes without a second payload copy. Without the setting, native extractors retain the 2 MiB default.
 
 Route-scoped middleware declared in `.api` is resolved as built-in first. Unknown names generate custom application middleware files.
 
@@ -242,7 +242,7 @@ Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for c
 - model/search clients generated by `rozectl`
 - registry/config/gateway clients where the generated surface supports them
 
-Generated model clients attached to `ServiceContext` own Roze database routing. For sharded entities, use generated routed accessors such as `ctx.model().order_for_key(&tenant_id)?` or `ctx.model().toasty_db_for_key(&tenant_id)?`; a plain repository accessor for a sharded SeaORM model is intentionally rejected before SQL. Use `ctx.sharded_db()?` and `transaction_for_key` for explicitly pinned single-shard transactions.
+Generated model clients attached to `ServiceContext` own Roze database routing. SeaORM is the default for newly generated SQL models; select Toasty explicitly with `--orm toasty`. Use `ctx.model().transaction(...)` for atomic SeaORM work across generated repositories: the scoped client retains hooks, policies, scopes, and builders, pins all reads/writes to the same primary transaction, bypasses cached reads, flushes invalidations only after commit, and discards them on rollback. For sharded entities, use generated routed accessors such as `ctx.model().order_for_key(&tenant_id)?` or `ctx.model().toasty_db_for_key(&tenant_id)?`; a plain repository accessor for a sharded SeaORM model is intentionally rejected before SQL. Use `ctx.model().transaction_for_key(&key, ...)` for one-shard SeaORM work or the lower-level `ctx.sharded_db()?.transaction_for_key` boundary; neither creates a cross-shard transaction.
 
 `roze_service::ServiceGroup` provides `RuntimeService`, `FnService`, `ServiceGroupConfig`, `ServiceGroupHandle`, and `LifecycleState` with `Starting`, `Running`, `Draining`, `Stopped`, and `Failed` phases. Use it for HTTP/RPC/consumer/job/background services that must share one shutdown signal and stop-hook timeout. When jobs are involved, prefer the `roze-job::JobService` adapter instead of hand-rolled loops.
 

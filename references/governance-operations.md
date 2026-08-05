@@ -12,7 +12,7 @@ Use built-in secret references for sensitive configuration: `env://NAME`, `${NAM
 
 Config center reloads must preserve the last valid configuration when a new payload fails to parse. Rebuild hot-updated subsystems by changed section or config signature instead of restarting everything for unrelated changes.
 
-Generated services should load config through `roze_config::load_service`, which resolves secrets and validates semantic constraints before listeners bind. Production rejects unknown fields, invalid governance ranges, zero limits or timeouts, invalid rate-limit key policies, missing production Redis configuration for enabled rate limits, and empty rate-limit namespaces. Development and test profiles keep unknown fields warning-only so app-owned experimental sections remain usable. Debug output must redact database, cache, broker, storage, registry, RPC-client, rate-limit Redis, token, and credential values. Roze now uses `jsonwebtoken` 11 while retaining the explicit AWS-LC provider and existing JWT/OIDC validation contract.
+Generated services should load config through `roze_config::load_service`, which resolves secrets and validates semantic constraints before listeners bind. Production rejects unknown fields, invalid governance ranges, zero limits, zero `tokens_per_refill`, zero timeouts, overflowing refill arithmetic, invalid rate-limit key policies, missing production Redis configuration for enabled rate limits, and empty rate-limit namespaces. Development and test profiles keep unknown fields warning-only so app-owned experimental sections remain usable. Debug output must redact database, cache, broker, storage, registry, RPC-client, rate-limit Redis, token, and credential values. Roze now uses `jsonwebtoken` 11 while retaining the explicit AWS-LC provider and existing JWT/OIDC validation contract.
 
 Generated REST/RPC binaries resolve configuration from `ROZE_CONFIG_PATH`, then `config.yaml` beside the crate manifest, then working-directory `config.yaml`. In deployments, prefer `ROZE_CONFIG_PATH` pointing at the deployment-owned YAML and keep source-tree configs as examples or development defaults.
 
@@ -33,12 +33,15 @@ REST, RPC, gateway, MQ, and job entry points should propagate standard Roze cont
 - tenant
 - locale
 - auth subject
+- verified client IP when available
 - metadata
 - retry budget
 
 If request id or trace id is missing, the entry point should generate and return it where the protocol supports headers/metadata.
 
-HTTP errors use `RozeError` and `roze-result::ApiResponse`. Use `RozeError::Conflict` for HTTP 409 and `RozeError::FailedPrecondition` for HTTP 412 instead of collapsing domain concurrency failures into bad requests or internal errors. RPC errors use `roze_rpc::rpc::status_from_error`, mapping these variants to `AlreadyExists` and `FailedPrecondition` with stable Roze metadata.
+HTTP errors use `RozeError` and `roze-result::ApiResponse`. Keep the numeric `ApiResponse` contract for existing APIs; opt into `CodedApiResponse` only when the public contract requires bounded string business codes. Use `RozeError::Conflict` for HTTP 409 and `RozeError::FailedPrecondition` for technical HTTP 412 failures such as `If-Match`. Use `RozeError::coded` for catalogued string errors, including HTTP 422 domain-rule rejection; use `coded_rate_limited` to retain `Retry-After`. RPC errors use `roze_rpc::rpc::status_from_error` and preserve string code, exact HTTP status, and retry delay. Business-code catalogs must be bounded and must never include user input or resource identifiers.
+
+Use the standard coded-error meanings consistently: 400 invalid syntax or fields, 401 authentication, 403 authorization, 404 not found, 409 state/version/idempotency/uniqueness conflict, 422 accepted syntax rejected by a domain rule, 429 rate limit, 500 internal failure, 502 invalid upstream response, 503 temporary dependency/service unavailability, and 504 upstream timeout. Success uses 200 for query/update/commands, 201 for creation, 202 for accepted asynchronous work, and 204 for an empty body.
 
 Prefer Roze context, error, result, tracing, and metrics helpers at every protocol boundary. Do not invent parallel request-id, trace-id, locale, tenant, response-envelope, or error-code conventions inside one service.
 
@@ -76,7 +79,7 @@ REST applies timeout, rate limit, breaker, shedding, and fallback. RPC applies t
 
 All governed boundaries should emit `roze_resilience_decisions_total` with bounded `boundary` values such as `rest`, `rpc`, `gateway`, `mq`, or `job`. Keep policy state local to the data path except for explicitly configured external stores such as Redis-backed rate limiting.
 
-Distributed rate limiting uses one Roze contract across REST, RPC, and Gateway. `governance.rate_limiter.store: auto` selects an explicit `governance.rate_limiter.redis_url`, then `cache.url`, then memory only outside production; `redis` requires a usable URL. `key_prefix` plus namespace scopes Redis keys, and generated services default namespace to `ServiceConfig.profile`. Store operations are bounded by `timeout_ms`; `fail-closed` returns REST/Gateway `503` or RPC `Unavailable` on store outage, while `fail-open` allows the request and records a degraded decision.
+Distributed rate limiting uses one Roze contract across REST, RPC, and Gateway. Token buckets use capacity `burst` and sustained rate `tokens_per_refill / refill_ms`; `tokens_per_refill` defaults to 1 for compatibility, and retry delays round up to at least one millisecond. Memory and Redis stores must use the same calculation. `governance.rate_limiter.store: auto` selects an explicit `governance.rate_limiter.redis_url`, then `cache.url`, then memory only outside production; `redis` requires a usable URL. `key_prefix` plus namespace scopes Redis keys, and generated services default namespace to `ServiceConfig.profile`. Store operations are bounded by `timeout_ms`; `fail-closed` returns REST/Gateway `503` or RPC `Unavailable` on store outage, while `fail-open` allows the request and records a degraded decision.
 
 Rate-limit keys are composite and ordered. Supported dimensions are route, verified client IP, authenticated subject, authenticated tenant, and explicitly listed headers or RPC metadata. Use `missing: reject` for production policies unless grouping missing identities is intentional. Header dimensions must not contain secrets; prefer subject or tenant claims over client-controlled headers. Roze hashes complete identity material before storage, and raw identity values must not appear in Redis keys, logs, or metrics.
 

@@ -20,7 +20,7 @@ Generate models from an `.ent` schema:
 
 ```bash
 rozectl model generate model/schema.ent --out services/user-api --format ent
-rozectl model generate model/schema.ent --out services/user-api --format ent --orm sea-orm
+rozectl model generate model/schema.ent --out services/user-api --format ent --orm toasty
 ```
 
 Inspect existing SQL tables:
@@ -40,16 +40,16 @@ Use `--schema` to disambiguate shared table names. For Mongo, `--schema` is the 
 
 ## ORM Choices
 
-Toasty is the default SQL model scaffold:
+SeaORM is the default SQL model scaffold:
 
 ```bash
 rozectl model generate example/user.sql --out services/user-api --format sql
 ```
 
-Generate SeaORM-style modules instead:
+Generate Toasty-style modules explicitly instead:
 
 ```bash
-rozectl model generate example/user.sql --out services/user-api --format sql --orm sea-orm
+rozectl model generate example/user.sql --out services/user-api --format sql --orm toasty
 ```
 
 On `--update`, omit `--orm` to inherit the generated ORM marker from `src/model/mod.rs`. Legacy projects can be inferred from an unambiguous `Cargo.toml` dependency. If the ORM cannot be determined, generation must stop and require explicit `--orm`. Switching an existing model scaffold between Toasty and SeaORM requires both `--orm <target>` and `--switch-orm`; review the generated file/dependency diff and preserve `src/model/*_ext.rs`.
@@ -94,6 +94,8 @@ Generated Toasty repositories should support the stable Roze model contract wher
 
 Generated SeaORM output should expose the same practical repository surface where possible.
 
+For atomic work across generated SeaORM repositories, prefer `ctx.model().transaction(...)`. Its transaction-scoped model client retains generated hooks, policies, scopes, and builders, forces every read and write through one primary transaction even if a query requests `ReadSource::Replica`, bypasses cached reads, and defers cache invalidation until commit. Rollback discards pending invalidations. The older per-repository transaction helper remains available when raw `&DatabaseTransaction` access is needed.
+
 SeaORM query builders use replicas by default. Use `.primary()` or `.read_from(roze_orm::ReadSource::Primary)` for authorization checks, read-before-write decisions, optimistic locking, state transitions, and any read whose freshness controls a mutation. Keep observability labels bounded through `ReadSource::label()`, which returns only `primary` or `replica`.
 
 For conditional mutations, use the generated `update_where()` builder and finish with `execute()`. It emits one SQL `UPDATE` and returns SeaORM `UpdateResult`; treat `rows_affected == 0` as the optimistic-lock or state-precondition signal and return `RozeError::FailedPrecondition` where that is the domain meaning.
@@ -110,7 +112,7 @@ Roze routing is explicit. SeaORM clients expose `<model>_for_key(&key)` for shar
 
 Roze hashes the application-supplied shard key with the versioned `fnv1a64-jump-v1` route. Strings use UTF-8 bytes, byte keys use their bytes unchanged, fixed-width integers use little-endian bytes, and `isize`/`usize` normalize to 64 bits. Treat routing algorithm or key encoding changes as data-placement compatibility changes.
 
-Do not assume transparent scatter-gather queries or implicit distributed transactions. Compose cross-shard reads in application logic, and use Saga, TCC, Outbox, or compensation explicitly for cross-shard workflows. `ShardedDatabase::transaction_for_key` pins a transaction to one shard, and `ShardTransaction::ensure_key` rejects keys that resolve elsewhere.
+Do not assume transparent scatter-gather queries or implicit distributed transactions. Compose cross-shard reads in application logic, and use Saga, TCC, Outbox, or compensation explicitly for cross-shard workflows. Generated SeaORM clients expose `ctx.model().transaction_for_key(&key, ...)`, which resolves one shard primary and provides the same scoped repositories and post-commit invalidation behavior. The lower-level `ShardedDatabase::transaction_for_key` pins a transaction to one shard, and `ShardTransaction::ensure_key` rejects keys that resolve elsewhere.
 
 ## Model Operation Chain
 
@@ -153,6 +155,7 @@ Important SQL type mappings:
 - SQL `JSON` and `JSONB` normalize to `.ent` `json`; SeaORM output uses `serde_json::Value`, while Toasty uses its JSON-string compatibility representation.
 - ordinary SQL `INT` / `INTEGER` columns generate `i32`; PostgreSQL `BIGINT` / `BIGSERIAL` / `INT8` and MySQL signed `BIGINT` generate `i64`; only explicit MySQL `BIGINT UNSIGNED` generates `u64`.
 - PostgreSQL `TIMESTAMP` and `TIMESTAMPTZ` preserve their distinction as `.ent` `timestamp` and `timestamptz`; SeaORM output uses chrono-backed `DateTime` and `DateTimeUtc`, and generation enables SeaORM `with-chrono` plus chrono `clock` and `serde` features, merging them into existing dependencies when present.
+- PostgreSQL SQL import recognizes named or anonymous table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK` constraints without inventing a `constraint` column. Composite primary and foreign keys remain unsupported and must fail clearly; recognized checks are not projected into generated validation.
 
 Mongo inspection samples collection documents for field and type inference, maps `_id` to `id`, preserves unique/index metadata, emits helpers for unique and compound indexes, and can generate an `ObjectId` id model for empty collections.
 
