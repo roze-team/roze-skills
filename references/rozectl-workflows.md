@@ -72,11 +72,15 @@ Use `--update` for normal regeneration. It preserves:
 
 Generated glue such as route registration, handler indexes, generated logic indexes, DTOs, OpenAPI, RPC server/client adapters, protobuf include modules, `build.rs`, `proto/service.proto`, and REST/RPC `src/svc/mod.rs` is refreshed. Do not put custom fields, initialization, methods, or business workflows in `src/svc/mod.rs`; move them to preserved `src/application.rs` hooks before upgrading. Put shared custom logic module declarations, imports, attributes, and re-exports in preserved `src/logic/prelude.rs`; put REST group-local declarations in `src/logic/<group>/prelude.rs`. RPC `--update` removes stale generated logic declarations from `src/logic/mod.rs`, so do not rely on that generated index for custom module declarations. On the first update of legacy projects, `rozectl` can transactionally append a missing default `register_services` hook and migrate resolvable custom `mod` plus related `use` declarations from old generated logic indexes into the matching prelude; the migration runs in the staging project and repeated updates preserve the migrated files. If a service uses generated models, run model generation after REST/RPC regeneration so model-specific context wiring is re-applied to the refreshed service context.
 
-Keep application-specific configuration fields in preserved `src/application_config.rs`. Current generated `src/config/mod.rs` owns that module through `#[path = "../application_config.rs"]`, exposes `ServiceConfigWithApplication<application_config::ApplicationConfig>`, and calls `load_service_with_application`. This lets extra binary targets reuse the config module without declaring a duplicate root module.
+Keep application-specific configuration fields in preserved `src/application_config.rs`. Current generated `src/config/mod.rs` owns that module through `#[path = "../application_config.rs"]`, exposes `ServiceConfigWithApplication<application_config::ApplicationConfig>`, and calls `load_service_with_application`. Newly generated application config derives always-on Veil `Debug` redaction for every field and keeps a hidden zero-sized marker while empty; generated manifests include direct Veil support with runtime toggling disabled. This lets extra binary targets reuse the config module without declaring a duplicate root module.
 
 During `--update`, `rozectl` migrates only exact historical generated config loaders using `roze_config::load`, `load_service`, or the first root-level typed loader. An unrecognized custom `src/config/mod.rs` is preserved and emits an actionable manual-migration warning; do not silence that warning by overwriting custom config code.
 
+REST/RPC `--update` also adds standard dependencies newly required by current templates, such as direct Veil support. Existing application versions, features, local paths, application-only dependencies, and unrelated Cargo sections remain authoritative. Current REST projects use directory modules at `src/config/mod.rs`, `src/types/mod.rs`, `src/openapi/mod.rs`, and `src/middleware/mod.rs`; after migration, remove the former flat files instead of retaining duplicate modules or compatibility forwarders.
+
 Use `--force` only for a deliberate full rebuild.
+
+For server-rendered HTML, place `@maud` before a REST route whose response is omitted or `EmptyResp`. REST generation adds the appropriate Maud dependency, creates application-owned `src/logic/**` markup returning `maud::Markup`, and preserves that file under `--update`; route, handler, OpenAPI, Web SDK, mock, and contract-test glue remain generator-owned. Maud routes keep the normal REST middleware/governance chain but cannot also use `@websocket` or idempotency middleware. Standalone projects receive `maud = "0.27"`; parent workspaces use `maud.workspace = true` only when declared there.
 
 API, RPC, stream, model, and search generation is transactional at the project-directory boundary. `rozectl` renders into a same-volume staging project, synchronizes managed service dependencies, formats and validates there, and replaces the target only after every step succeeds. Generated REST/RPC/model manifests use `workspace = true` only when the dependency actually exists in the parent `[workspace.dependencies]`; missing entries fall back to explicit versions and remain deterministic across repeated updates. Stream generation runs rustfmt over framework-owned Rust files in create, `--update`, and `--force` modes before committing the staged project. Stream `--update` refreshes generator-managed runtime, broker, and common dependencies while preserving application-added dependencies and unrelated Cargo sections, including local RPC/workspace crates and Roze crates used only by preserved `src/stream/consumer.rs`; `--force` still replaces the complete scaffold. Stream targets excluded by a parent Cargo workspace receive standalone package metadata, explicit dependency versions, an empty local `[workspace]` boundary, and are not added to the parent workspace members; this manifest shape should remain stable across repeated updates. Parse, extension, dependency-resolution, manifest-merge, or formatting failures should leave the existing project unchanged.
 
@@ -242,6 +246,14 @@ rozectl dev down
 `rozectl dev` defaults to `docker-compose.integration.yml` unless a compose file is supplied.
 
 Generated REST/RPC binaries resolve config from `ROZE_CONFIG_PATH`, then `config.yaml` beside the crate manifest, then working-directory `config.yaml`. Deployment units should set `ROZE_CONFIG_PATH` to the deployment-owned YAML path instead of copying config into the build checkout.
+
+Validate deployment-owned service configuration before rollout:
+
+```bash
+rozectl config validate --file deploy/config/rest.production.yaml
+```
+
+This parses the YAML, resolves secret references, and runs typed service/application validation. `rozectl doctor` now applies the same semantic validation when checking a config file. Source-tree `apps/*/config.yaml` files are development defaults; production images should set `ROZE_CONFIG_PATH=/etc/roze/config.yaml` and mount the reviewed non-secret YAML read-only rather than baking it into the image.
 
 ## Deployment Artifacts
 

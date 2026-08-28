@@ -40,7 +40,7 @@ Ownership rules:
 - `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`; do not place custom resources or business workflows there.
 - `config.yaml` is local/deployment config and is preserved by `--update`.
 
-REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. Existing numeric envelopes keep success `code: 0`. APIs that require bounded string business codes can opt into `CodedApiResponse::ok(data)` or `CodedApiResponse::success(...)`; wrap them with HTTP 201/202 when appropriate, and use HTTP 204 directly for an empty body. HTTP errors should use Roze error types and helpers instead of custom JSON.
+REST responses should use `roze-result::ApiResponse` through `roze_http::IntoResponse`. Roze exposes one numeric envelope: success uses `code: 0`, and standard framework errors use their HTTP status as the numeric code. Keep HTTP status as the transport outcome instead of inferring it only from the body. OpenAPI, generated Web SDKs, mocks, and contract tests must use the same numeric shape; Roze does not generate a parallel string business-code envelope or string-code `.api` annotations. HTTP errors should use Roze error types and helpers instead of custom JSON.
 
 Prefer generated REST adapters and Roze HTTP helpers for routing, request extraction, response wrapping, validation, timeout metadata, context propagation, WebSocket upgrades, client address extraction, middleware ordering, health, metrics, and OpenAPI exposure. Add custom Tower layers only after confirming the generated middleware/config surface cannot express the behavior.
 
@@ -73,6 +73,10 @@ Generated REST and RPC entrypoints call `src/application.rs::register_services(&
 `/reports/exports` and `/charts/query` are stable framework-owned interface contracts. Application logic should back them with `roze_report` and Roze query primitives for bounded chart queries, asynchronous CSV/XLSX exports, tenant/auth binding, cancellation, expiry, object storage, and audit behavior instead of inventing parallel report protocols. Register the whitelisted `Arc<dyn roze_report::ReportDataSource>` or `ReportCatalog` from `src/application.rs::configure_context`; an unconfigured source should fail closed with `503`, not return fabricated empty data.
 
 Annotate a GET route with `@websocket` to generate a native Roze WebSocket endpoint. Generated handler and route glue use `roze_http::ws::WebSocketUpgrade`; application-owned frame handling lives under `src/logic/**` and is preserved by `--update`. WebSocket routes use `EmptyReq`/`EmptyResp`, cannot use idempotency middleware, and are excluded from OpenAPI and normal HTTP SDK generation. Generated fully prefixed upgrade routes are added to `auth_public_routes`; this exempts only the HTTP upgrade, so application-owned WebSocket logic must reject business frames until its protocol authentication succeeds. Use `roze_http::ws::{WebSocket, Message, CloseFrame, WebSocketConfig}` instead of depending on Hyper upgrade internals.
+
+Annotate a REST route with `@maud` when its application-owned logic should render server-side HTML. The route must omit its response DTO or use `EmptyResp`; generated logic returns `maud::Markup`, starts with a complete escaped `maud::html!` document, and is preserved by `--update`. Generated handlers retain normal extraction, validation, auth, permission, rate-limit, timeout, fallback, tracing, and request context, then respond as `text/html; charset=utf-8`. OpenAPI describes a `text/html` string, TypeScript/JavaScript clients return `string`, and generated mocks and contract tests use HTML semantics. Do not combine `@maud` with `@websocket` or idempotency middleware.
+
+Use `roze_http::Html<T>` when any template engine can render into a string. For handwritten Maud handlers, enable the optional `roze-http` `maud` feature and keep `maud` as a direct dependency; do not enable Maud's `axum` feature in a Roze service.
 
 When `rest.connect_info: true`, generated entrypoints use `RestServer::with_connect_info()` so handlers and middleware can extract `ConnectInfo<SocketAddr>` and policy-resolved `roze_http::client_ip::ClientIp`. Generated REST and WebSocket handlers copy the verified value into request-context metadata as `client_ip` before rate limiting and application logic. Forwarded headers are ignored unless the direct peer matches `rest.middlewares.trusted_proxy_cidrs`; configuring trusted proxy CIDRs without connect info is a startup error.
 
@@ -110,7 +114,7 @@ Ownership rules:
 - `src/pb/mod.rs`, `build.rs`, and `proto/service.proto` are generator-owned.
 - `src/svc/mod.rs` is generator-owned service dependency wiring and is refreshed by REST/RPC `--update`.
 
-RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and include standard metadata such as error code, kind, exact HTTP status for coded errors, request id, trace id, locale, and retry delay. `RozeError::Conflict` maps to gRPC `AlreadyExists`, while `RozeError::FailedPrecondition` maps to `FailedPrecondition`; both round-trip through Roze error-kind metadata. `RozeError::coded(status, code, message)` preserves its bounded string code and HTTP status through `x-roze-error-code` and `x-roze-http-status`; use `coded_rate_limited` when HTTP 429 must also preserve `Retry-After`.
+RPC servers should restore request context with `roze_rpc::rpc::request_context`. RPC clients should accept `&roze_context::Context` as the first business context parameter. RPC errors should convert through `roze_rpc::rpc::status_from_error(err, &request_ctx)` and preserve bounded numeric error code, error kind, request id, trace id, locale, and retry delay metadata. `RozeError::Conflict` maps to gRPC `AlreadyExists`, while `RozeError::FailedPrecondition` maps to `FailedPrecondition`; both round-trip through Roze error-kind metadata.
 
 Prefer `roze_rpc` server/client scaffolding, registry integration, timeout/retry/breaker metadata, and error metadata helpers over direct tonic-only wiring when building Roze services. Custom tonic interceptors should preserve Roze context and status metadata contracts.
 
@@ -157,7 +161,7 @@ Roze `.api` files support:
 - `info (...)`
 - `type Name { ... }` and grouped `type (...)`
 - `service name { ... }`
-- `@server`, `@handler`, `@doc`, and `@middleware`
+- `@server`, `@handler`, `@doc`, `@middleware`, and REST `@maud`
 - `@permission` before REST routes or RPC methods
 - imports
 - HTTP methods `get`, `post`, `put`, `patch`, and `delete`
@@ -225,7 +229,7 @@ Prefer built-in middleware names in `.api` annotations and `config.yaml` before 
 
 Business logic should log with `tracing` macros directly. Do not pass or construct trace ids manually; Roze middleware carries trace ids in the request span.
 
-Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for configuration readiness, dependency setup, registry or subscription readiness, shutdown, stop, and failure. Native HTTP logs request start/completion; RPC governance logs method start/completion/cancellation. Safe `RUST_LOG=debug` framework logs may include route matches, middleware plans, retry decisions, stream ack/nack, model query kinds, WebSocket lifecycle decisions, and ServiceGroup phase changes, but must not include request/message bodies, WebSocket message bodies, auth values, SQL arguments, fallback payloads, or dependency error messages.
+Generated REST, RPC, and stream entrypoints emit structured lifecycle logs for configuration readiness, dependency setup, registry or subscription readiness, shutdown, stop, and failure. Generated binaries retain `roze_log::TracingGuard` for the complete service lifetime. Application logic emits started and exactly one completed or failed event with elapsed time and request correlation; Maud adds `html.render.completed` without rendered HTML. Safe debug logs may include route matches, middleware plans, retry decisions, stream ack/nack, model query kinds, WebSocket lifecycle decisions, and ServiceGroup phase changes, but must not include request/message bodies, rendered HTML, auth/cookie values, SQL arguments, fallback payloads, or dependency response bodies. Use `roze_log::Sensitive` when a value must be represented as `[REDACTED]` for both `Display` and `Debug`.
 
 ## Service Context And Lifecycle
 

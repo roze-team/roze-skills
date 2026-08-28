@@ -8,12 +8,16 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 
 - `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows, including partial-workspace dependency normalization
 - Roze `.api` and `.proto` contract-first development
-- Generated REST service structure with Roze native HTTP, Tower, Roze middleware, typed application configuration, numeric or string business-code envelopes, and semantic Roze errors
-- Generated RPC service structure with tonic/prost, Roze gRPC routing, managed upstream RPC clients, readiness checks, typed application configuration, and exact HTTP/business-error metadata round trips
+- Generated REST service structure with Roze native HTTP, Tower, Roze middleware, typed application configuration, numeric response envelopes, and semantic Roze errors
+- Native server-rendered HTML through `roze_http::Html<T>` and generated `@maud` routes, including preserved markup logic and HTML-aware OpenAPI, Web SDK, mock, and contract-test output
+- Generated RPC service structure with tonic/prost, Roze gRPC routing, managed upstream RPC clients, readiness checks, typed application configuration, and numeric error metadata round trips
 - `roze-service.yaml` dependency manifests for generated API/RPC service-to-service calls
 - Generated stream worker scaffolds with Roze MQ/Kafka provider primitives, native-Windows `rdkafka-cmake` builds, preserved application manifest dependencies, and rustfmt-clean generated Rust glue
 - Native AI runtime and `rozectl ai generate` scaffolds with provider-neutral models, tools, agents, workflow graphs, RAG, teams, streaming, and checkpoints
+- Provider-neutral `roze-sms` delivery with Aliyun support, bounded retries/metrics, redaction, and Roze rate-limit/idempotency/outbox composition
 - Generated service lifecycle/bootstrap with `roze_service::ServiceGroup`, readiness/draining behavior, health probes, and generated ops assets
+- Production logging through `ServiceConfig.logging`, bounded async sinks, rotation/compression/retention, stable event names, sensitive-value handling, and fail-closed non-lossy audit JSONL
+- Native DTM control plane guidance for authenticated TCC/Saga coordination, branch-origin allowlists, barriers, bounded recovery, persistent leases, and audit events
 - Application-owned vs generator-owned file boundaries, including generated logic indexes, preserved `src/logic/prelude.rs`, REST group preludes, legacy config-loader migration, `src/application_config.rs`, and preserved `src/application.rs` hooks
 - Prefer-Roze guidance for using built-in generators, crates, middleware, config, governance, context, errors, health, metrics, tracing, registry, rate limiting, cache, MQ, DTM, and search/model helpers
 - Permission annotations, trusted client-IP propagation, request-body limits, idempotency middleware, Redis standalone/Cluster topology, high-rate distributed token buckets, SeaORM/Toasty transactional SQL outbox, object storage, cache consistency, and read-model query composition

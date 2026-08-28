@@ -106,6 +106,8 @@ Roze-specific rules:
 
 Before adding a dependency, check whether Roze or the standard library already provides the capability.
 
+Roze 1.0 development, generated production verification, and release CI are pinned to Rust 1.98.0 through the workspace toolchain. Use that pin for reproducible framework work and treat the scheduled latest-stable lane as forward-compatibility evidence. The pin is not an MSRV declaration; do not claim a fixed MSRV until a dedicated CI lane continuously verifies one.
+
 Selection criteria:
 
 - actively maintained

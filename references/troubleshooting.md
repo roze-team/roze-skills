@@ -4,6 +4,10 @@ Use this reference when diagnosing Roze generation, runtime, integration, or ver
 
 ## Contract And Generation Issues
 
+Symptom: an `@maud` route fails validation or generates the wrong response shape.
+
+Remove the response DTO or use `EmptyResp`, and do not combine the route with `@websocket` or idempotency middleware. Regenerate all contract surfaces together: the logic returns `maud::Markup`, HTTP uses `text/html; charset=utf-8`, OpenAPI and clients use a string response, and mocks/tests follow HTML semantics. Keep markup changes in the preserved `src/logic/**` file rather than generated handlers or route glue.
+
 Symptom: `rozectl api generate` rejects a contract.
 
 Check whether the `.api` file contains RPC method declarations. REST generation expects REST route blocks. Use `rozectl rpc generate` for RPC method declarations.
@@ -84,6 +88,22 @@ Symptom: deployed service loads the wrong `config.yaml`.
 
 Check `ROZE_CONFIG_PATH` first. Generated REST/RPC binaries prefer that path over crate-local and working-directory defaults. Deployment managers should set it to the deployment-owned YAML file.
 
+Symptom: `rozectl doctor` or `rozectl config validate --file` rejects a deployment config.
+
+Treat this as semantic configuration failure, not just a missing-file check. Resolve secret references in the target environment, fix unknown fields and typed validation errors, and keep production YAML deployment-owned. Container images should mount that file read-only at the `ROZE_CONFIG_PATH` location instead of copying source-tree development config into the image.
+
+Symptom: Config Center starts without watching the expected key.
+
+Set `ROZE_CONFIG_CENTER_KEY` explicitly. Current generated application integrations do not derive it from namespace/app and do not generate legacy alias handling; namespace and app remain audit metadata.
+
+Symptom: logging config fails after upgrade or rotated/audit records disappear.
+
+Replace removed `file_name` and `compress_rotated` fields atomically with `file_name_pattern` and `compression`; logging file config rejects unknown fields in every profile. Hourly/daily patterns require exactly one `{date}` token, while `rotation: never` forbids it. Keep `TracingGuard` alive through shutdown, inspect `roze_log_lines_dropped_total`, and use a dedicated non-lossy `logging.audit` sink for `roze.audit` events when audit durability is required.
+
+Symptom: DTM rejects a branch URL, recovery request, or production startup.
+
+Use exact entries in `allowed_branch_origins`, without paths, wildcards, credentials, or redirect dependence. Production forbids memory storage and requires a 32-byte control token, unique worker ID, persistent store, and valid recovery lease ratio. Manual recovery intentionally rejects ambiguous in-progress states; use the native state machine and barriers rather than forcing duplicate branch calls.
+
 Symptom: WebSocket upgrade fails with service-level auth enabled.
 
 Regenerate from a checkout that emits fully prefixed WebSocket public routes. The generated HTTP upgrade route is public only for the upgrade handshake; application-owned frame logic must still authenticate the session before accepting business frames.
@@ -116,9 +136,9 @@ Symptom: RPC errors lack metadata.
 
 Ensure server adapters convert errors through `roze_rpc::rpc::status_from_error(err, &request_ctx)`. Standard metadata includes Roze error code, error kind, request id, trace id, and locale.
 
-Symptom: a string business code becomes numeric or its HTTP status changes after RPC.
+Symptom: generated OpenAPI, Web SDK, mocks, or contract tests expect a string business code.
 
-Return `RozeError::coded` and keep conversion through Roze RPC helpers. Current metadata carries `x-roze-error-code` and `x-roze-http-status`; coded 429 errors also preserve retry delay. Legacy `ApiResponse` remains numeric, so use `CodedApiResponse` explicitly when the success envelope requires `"code": "OK"`.
+Regenerate all contract surfaces from the current checkout. Roze now exposes one numeric `ApiResponse` envelope: success is `code: 0`, standard framework errors use numeric codes, and `.api` has no string-code `@status` or `@error` annotations. Remove `CodedApiResponse` and string-code assumptions from application-owned tests and clients instead of patching generated files.
 
 Symptom: conflict or stale-version errors change meaning across REST and RPC.
 
