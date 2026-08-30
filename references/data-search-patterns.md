@@ -96,9 +96,15 @@ Generated SeaORM output should expose the same practical repository surface wher
 
 For atomic work across generated SeaORM repositories, prefer `ctx.model().transaction(...)`. Its transaction-scoped model client retains generated hooks, policies, scopes, and builders, forces every read and write through one primary transaction even if a query requests `ReadSource::Replica`, bypasses cached reads, and defers cache invalidation until commit. Rollback discards pending invalidations. The older per-repository transaction helper remains available when raw `&DatabaseTransaction` access is needed.
 
+Use generated `.for_update()?` and `.for_share()?` only on transaction-scoped SeaORM queries. They stay on the primary transaction, emit native PostgreSQL/MySQL row locks, and reject SQLite explicitly; never treat an unlocked SQLite query as equivalent evidence.
+
 SeaORM query builders use replicas by default. Use `.primary()` or `.read_from(roze_orm::ReadSource::Primary)` for authorization checks, read-before-write decisions, optimistic locking, state transitions, and any read whose freshness controls a mutation. Keep observability labels bounded through `ReadSource::label()`, which returns only `primary` or `replica`.
 
 For conditional mutations, use the generated `update_where()` builder and finish with `execute()`. It emits one SQL `UPDATE` and returns SeaORM `UpdateResult`; treat `rows_affected == 0` as the optimistic-lock or state-precondition signal and return `RozeError::FailedPrecondition` where that is the domain meaning.
+
+Generated SeaORM string predicates escape literal `%`, `_`, and backslash and attach an explicit backslash `ESCAPE` clause. Case-insensitive contains/equality use portable `LOWER(column) LIKE lowercased_pattern` semantics across SQLite, PostgreSQL, and MySQL; do not replace them with PostgreSQL-only `ILIKE` in shared generated code.
+
+SQLite SeaORM create/upsert paths reload by the original custom or composite primary key, not an unrelated `last_insert_id`. Preserve that key tuple when extending writes; this also applies to non-auto-increment string or composite IDs.
 
 Projection helpers should apply predicates before projection. For nullable fields, preserve nullability in return types; for example, a nullable string field can produce `Vec<Option<String>>` for `pluck_<field>` and `Option<Option<String>>` for `first_<field>`.
 
@@ -187,7 +193,9 @@ src/search/mod.rs
 src/search/*.rs
 ```
 
-Search generated code should use `roze-search` for health checks, document indexing, document deletion, and text search. Generated structs should preserve original index field names with `serde(rename = "...")`.
+Search generated code should use `roze-search` for health, idempotent index/settings initialization, document repair/index/delete mutations, and typed filter/sort/page or text queries. `initialize` waits for settings before returning; mutation helpers return `SearchTask`, whose `wait(timeout)` must stay bounded. Validate filter and sort fields against the `.search` allowlists before provider encoding, and reserve the read-only `client()` escape hatch for queries not covered by the typed surface. Generated structs preserve original index field names with `serde(rename = "...")`.
+
+Repeated `--update` calls merge exports in `src/search/mod.rs` so multiple `.search` schemas coexist deterministically. Search generation must inherit the project's existing Roze dependency source and exact Git pin and reject conflicting pins rather than silently following Git HEAD.
 
 Keep database models under `src/model` and search indexes under `src/search`; do not merge the generated ownership boundaries.
 

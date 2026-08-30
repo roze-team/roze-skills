@@ -100,9 +100,9 @@ Symptom: logging config fails after upgrade or rotated/audit records disappear.
 
 Replace removed `file_name` and `compress_rotated` fields atomically with `file_name_pattern` and `compression`; logging file config rejects unknown fields in every profile. Hourly/daily patterns require exactly one `{date}` token, while `rotation: never` forbids it. Keep `TracingGuard` alive through shutdown, inspect `roze_log_lines_dropped_total`, and use a dedicated non-lossy `logging.audit` sink for `roze.audit` events when audit durability is required.
 
-Symptom: DTM rejects a branch URL, recovery request, or production startup.
+Symptom: external DTM compatibility, startup, or release-revision checks fail.
 
-Use exact entries in `allowed_branch_origins`, without paths, wildcards, credentials, or redirect dependence. Production forbids memory storage and requires a 32-byte control token, unique worker ID, persistent store, and valid recovery lease ratio. Manual recovery intentionally rejects ambiguous in-progress states; use the native state machine and barriers rather than forcing duplicate branch calls.
+Confirm the application pins a full `roze-dtm` revision, then run `python scripts/check-roze-dtm-compatibility.py --dtm-dir ../roze-dtm --output <report>` from the matching Roze checkout. Compare typed `expected_revision` with `GET /api/dtmsvr/version`'s `release_revision`; do not fix a mismatch by following DTM `main` or copying coordinator code into the service. Use `--require-roze-head` only when the coordinated upgrade requires DTM's Roze pin to equal the current Roze commit, and run recovery/failure evidence in the DTM repository.
 
 Symptom: WebSocket upgrade fails with service-level auth enabled.
 
@@ -197,9 +197,9 @@ Symptom: Stream `--update` removes a dependency used only by the preserved consu
 
 Regenerate with the current `rozectl`. Stream updates must merge generator-managed dependencies while preserving application-added dependencies and unrelated Cargo sections. Invalid application manifest syntax should fail transactionally without replacing the project.
 
-Symptom: custom string contains filters behave differently across Toasty/SeaORM.
+Symptom: custom string contains filters behave differently across Toasty/SeaORM or SQL backends.
 
-Generated ent-style predicates include `contains`/`icontains` helpers and escape LIKE patterns. For advanced search semantics, keep custom query orchestration in `src/model/*_ext.rs` or application modules until the active Roze checkout documents a richer stable predicate API.
+Regenerate with a current `rozectl`. Generated predicates escape literal `%`, `_`, and backslash; SeaORM emits an explicit backslash `ESCAPE` clause and portable `LOWER(column) LIKE lowercased_pattern` for case-insensitive operations. Keep advanced semantics in `src/model/*_ext.rs` instead of replacing shared generated code with PostgreSQL-only `ILIKE`.
 
 Symptom: a SeaORM read immediately before a write observes stale data.
 
@@ -208,6 +208,18 @@ Generated SeaORM queries read from replicas by default. Use `.primary()` or `.re
 Symptom: a multi-repository SeaORM transaction reads from a replica or invalidates cache before commit.
 
 Use `ctx.model().transaction(...)`, or `transaction_for_key` for one sharded key. Repositories from that scoped client force all sources to the primary transaction, bypass cached reads, and flush pending invalidations only after commit; rollback discards them.
+
+Symptom: a generated SeaORM row lock does not lock or fails on SQLite.
+
+Call `.for_update()?` or `.for_share()?` only through a transaction-scoped model client on PostgreSQL/MySQL. SQLite is rejected intentionally because it cannot provide the same row-lock contract; use a conditional update or a backend-appropriate transaction strategy instead.
+
+Symptom: SQLite create/upsert reloads the wrong row for a custom or composite ID.
+
+Regenerate with the current `rozectl` and preserve the original primary-key tuple through execution. Current SeaORM output reloads by that key and does not trust SQLite `last_insert_id` after an upsert conflict.
+
+Symptom: search generation overwrites another schema or changes the Roze Git revision.
+
+Regenerate with the current `rozectl --update`. It merges deterministic exports in `src/search/mod.rs`, inherits the existing workspace/path/Git source tuple, and rejects conflicting Roze Git pins. Do not resolve the conflict by floating `roze-search` to HEAD.
 
 Symptom: optimistic locking performs a read and write but still races.
 
