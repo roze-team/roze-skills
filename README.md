@@ -6,7 +6,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 
 ## What This Skill Covers
 
-- `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows, including partial-workspace dependency normalization
+- `rozectl` API/RPC/model/search/OpenAPI/typed TypeScript and JavaScript Web SDK/deployment workflows, including partial-workspace dependency normalization and reproducible Roze Git pins
 - Roze `.api` and `.proto` contract-first development
 - Generated REST service structure with Roze native HTTP, Tower, Roze middleware, typed application configuration, numeric response envelopes, and semantic Roze errors
 - Native server-rendered HTML through `roze_http::Html<T>` and generated `@maud` routes, including preserved markup logic and HTML-aware OpenAPI, Web SDK, mock, and contract-test output
@@ -23,11 +23,11 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Permission annotations, trusted client-IP propagation, request-body limits, idempotency middleware, Redis standalone/Cluster topology, high-rate distributed token buckets, SeaORM/Toasty transactional SQL outbox, object storage, cache consistency, and read-model query composition
 - Native WebSocket route generation, Roze WebSocket runtime API, client address extraction, and trusted proxy policy
 - Reporting and chart endpoint contracts backed by Roze report/query primitives and preserved `src/application.rs` data-source hooks
-- `.ent` model source guidance and ent-style query/create/update/delete/conditional-update/projection/aggregate/hook/policy/mixin builders
+- Independent `roze-ent` model parser/inspector/renderer ownership, `rozectl` host wiring, `.ent` model source guidance, and ent-style query/create/update/delete/conditional-update/projection/aggregate/hook/policy/mixin builders
 - Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
 - SeaORM-default and explicit Toasty model generation patterns, including direct `serde` derive dependencies, workspace-aware manifests, scoped SeaORM model transactions and row locks, primary/replica read selection, key-preserving SQLite writes, portable string predicates, `update_where()` optimistic locking, SQL table constraints, explicit `.ent` `RozeShard` database sharding, and generated routed model accessors
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns with typed filters/sorts/pages, lifecycle tasks, multi-schema updates, and dependency-pin inheritance
-- Config, typed top-level application config, strict production config validation, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting, MQ/job governance, cache, Redis topology, Qiniu Kodo/S3-compatible storage, external DTM integration, minimal `/opt/<project-name>/<service-name>` VM/systemd layout, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
+- Config, typed top-level application config, strict production config validation, SQL logging/slow-query policy, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting and isolated circuit breakers, MQ/job governance, adaptive persistent outbox relay, cache, Redis topology, Qiniu Kodo/S3-compatible storage, external DTM integration, minimal `/opt/<project-name>/<service-name>` VM/systemd layout, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
 - Roze 1.x stability vs operational evidence guidance
 - Common troubleshooting paths for regeneration, validation, middleware, context, and local dependencies
 
@@ -93,6 +93,7 @@ This skill summarizes Roze conventions, but the active Roze checkout remains the
 - `docs/usage/*`
 - `docs/contracts/*`
 - `apps/rozectl`
+- the exact `roze-ent` revision pinned by `apps/rozectl/Cargo.toml` for model parser/inspector/renderer changes
 - touched `crates/roze-*` modules
 
 When Roze code and this skill disagree, update the skill after confirming the current behavior in code and tests.

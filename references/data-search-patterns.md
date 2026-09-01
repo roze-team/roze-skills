@@ -4,6 +4,8 @@ Use this reference for model generation, repository ownership, ORM choices, data
 
 ## Model Generation
 
+The independently versioned [`roze-ent`](https://github.com/roze-team/roze-ent) library is the single source of truth for model schema parsing, normalization, SQL/Mongo inspection, and SeaORM/Toasty/MongoDB rendering. `rozectl model` pins one `roze-ent` revision and acts only as the CLI/project host for dependency selection, service-context wiring, transactional staging, formatting, and validation. Change parser, inspector, or renderer behavior in `roze-ent`; change only CLI adaptation and Roze project wiring in `apps/rozectl`.
+
 Generate models from SQL DDL:
 
 ```bash
@@ -60,7 +62,7 @@ Standalone Toasty and SeaORM model generation must declare direct `serde` with t
 
 ## Entity Schema Source
 
-Current Roze model generation first writes or reads `src/model/schema.ent`, then generates Rust model code from that `.ent` schema. SQL DDL, Roze model DSL, and database inspection are import paths into `.ent`; `.ent` is the model codegen source.
+Current `roze-ent` model generation first writes or reads `src/model/schema.ent`, then generates Rust model code from that `.ent` schema. SQL DDL, Roze model DSL, and database inspection are import paths into `.ent`; `.ent` is the model codegen source.
 
 Generated schema-owned files:
 
@@ -195,7 +197,7 @@ src/search/*.rs
 
 Search generated code should use `roze-search` for health, idempotent index/settings initialization, document repair/index/delete mutations, and typed filter/sort/page or text queries. `initialize` waits for settings before returning; mutation helpers return `SearchTask`, whose `wait(timeout)` must stay bounded. Validate filter and sort fields against the `.search` allowlists before provider encoding, and reserve the read-only `client()` escape hatch for queries not covered by the typed surface. Generated structs preserve original index field names with `serde(rename = "...")`.
 
-Repeated `--update` calls merge exports in `src/search/mod.rs` so multiple `.search` schemas coexist deterministically. Search generation must inherit the project's existing Roze dependency source and exact Git pin and reject conflicting pins rather than silently following Git HEAD.
+Repeated `--update` calls merge exports in `src/search/mod.rs` so multiple `.search` schemas coexist deterministically. Search generation must inherit the project's existing Roze dependency source and canonical `rev`/`tag`/`branch` pin and reject conflicting pins rather than silently following Git HEAD. New Git dependencies use the exact Roze revision that built `rozectl`.
 
 Keep database models under `src/model` and search indexes under `src/search`; do not merge the generated ownership boundaries.
 
@@ -208,6 +210,8 @@ For generator-only model/search work, start with:
 ```bash
 cargo test -p rozectl -- --skip postgres --skip mysql --skip mongo
 ```
+
+For model parser, normalization, inspection, or renderer changes, run the relevant tests in the exact `roze-ent` checkout first, update Roze's pinned revision, then run the `rozectl` adapter and generated compile-smoke tests. Do not recreate removed model-generator suites inside Roze merely to avoid testing the owning repository.
 
 Run database-specific tests only when credentials or local integration services are available:
 

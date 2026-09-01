@@ -100,6 +100,10 @@ Symptom: logging config fails after upgrade or rotated/audit records disappear.
 
 Replace removed `file_name` and `compress_rotated` fields atomically with `file_name_pattern` and `compression`; logging file config rejects unknown fields in every profile. Hourly/daily patterns require exactly one `{date}` token, while `rotation: never` forbids it. Keep `TracingGuard` alive through shutdown, inspect `roze_log_lines_dropped_total`, and use a dedicated non-lossy `logging.audit` sink for `roze.audit` events when audit durability is required.
 
+Symptom: SQL statements disappear after upgrade, or production logs expose too much SQL.
+
+The default is `database.sqlx_logging: false`. Enable it only when full statement diagnostics are required; ordinary statements then use `DEBUG`, while queries exceeding positive `slow_query_threshold_ms` use `WARN`. Keep production `INFO` logs to bounded summaries and never log SQL arguments.
+
 Symptom: a VM/systemd service starts from the wrong config, cannot write logs, or accumulates release files under `/opt`.
 
 Restore the minimal `/opt/<project-name>/<service-name>/` layout: `<service-name>` is a directory whose only entries are executable `<service-name>`, `config.yaml`, and `logs/`. Confirm `config.yaml` declares the same service `name`, then align `WorkingDirectory`, `ExecStart`, `ROZE_CONFIG_PATH`, and `<project-name>-<service-name>.service`. For `one-auth`, the config path is `/opt/one-auth/<service-name>/config.yaml`. Make only `logs/` writable by the service account, and keep units, secrets, staging files, release archives, and rollback copies outside the live service directory. Do not apply this host layout to generated container images.
@@ -193,9 +197,21 @@ Symptom: Toasty transactional outbox enqueue fails before SQL.
 
 Pass a PostgreSQL/MySQL `toasty::Transaction` to `SqlOutboxStore::enqueue_in_transaction`. Non-SQL Toasty drivers and a mismatch between the Toasty SQL placeholder dialect and configured outbox backend are rejected intentionally.
 
+Symptom: outbox delivery waits for every fixed poll or spins while a backlog exists.
+
+Use `roze_transaction::run_outbox_relay` instead of a hand-written fixed sleep around `relay_outbox_batch`. Configure positive `interval_ms` and `max_idle_interval_ms >= interval_ms`; local enqueues notify the relay, empty polls back off, and non-empty batches drain immediately. Keep bounded polling for cross-process inserts and missed notifications.
+
 Symptom: model generation chooses the wrong ORM during update.
 
 SeaORM is the default only for new model scaffolds. On update, omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold.
+
+Symptom: a model parser, database inspector, or renderer fix in `apps/rozectl` has no effect or duplicates logic.
+
+Make schema parsing, normalization, SQL/Mongo inspection, and SeaORM/Toasty/MongoDB rendering changes in the pinned `roze-ent` repository. Keep `apps/rozectl` limited to CLI adaptation, Roze dependency selection, service-context wiring, staging, formatting, and validation; then update the pinned `roze-ent` revision and run both upstream and adapter tests.
+
+Symptom: generated Cargo manifests mix floating and pinned canonical Roze Git dependencies.
+
+Regenerate with a current `rozectl --update`. One existing canonical `rev`, `tag`, or `branch` is propagated to floating `roze-*` dependencies while features are preserved; conflicting pins fail closed. New Git-generated projects use the exact Roze revision that built `rozectl`, not moving HEAD.
 
 Symptom: Stream `--update` removes a dependency used only by the preserved consumer.
 
