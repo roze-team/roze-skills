@@ -143,6 +143,27 @@ Keep DTM endpoints, token secrets, timeouts, and `expected_revision` in typed ap
 
 Deploy DTM as a separate workload with explicit TLS/trust roots, bearer scope, network policy, persistent storage, workers, recovery, retention, audit, readiness, metrics, tracing, and topology. Generated `ops/data-consistency.yaml` treats it as an external dependency. Distributed-transaction production claims require exact-revision evidence for failure injection, crash/restart and delayed-message recovery, cross-language compatibility, and sustained runs; Roze's local outbox/compensation reference systems do not prove coordinator behavior.
 
+## VM And Systemd Deployment Layout
+
+Deploy every host-based service under `/opt/<service>/`. The directory name and executable name must equal the service name. Its top level contains exactly two files and one directory:
+
+```text
+/opt/match-ws/
+  match-ws
+  config.yaml
+  logs/
+```
+
+Use `/opt/match-ws` as the canonical example. For another service, replace both `match-ws` occurrences with that service's name. Set the process working directory to `/opt/<service>`, execute `/opt/<service>/<service>`, and set `ROZE_CONFIG_PATH=/opt/<service>/config.yaml` explicitly even though the local default is `config.yaml`.
+
+Do not place source code, `Cargo.toml`, shell scripts, `.env` files, PID files, release archives, checksums, temporary downloads, backups, or versioned release directories inside the service directory. Keep the systemd unit under `/etc/systemd/system/`, secrets in an approved external secret/file location, and release plus rollback artifacts in a deployment-owned staging/archive location outside `/opt/<service>`.
+
+Create `logs/` before startup and make only that directory writable by the service account. Keep the binary executable and non-writable by the service process; keep `config.yaml` read-only with the narrowest practical group access. When Roze file logging or audit logging is enabled, resolve its directories under `/opt/<service>/logs/`; otherwise the platform may collect stdout while the required `logs/` directory remains available.
+
+Stage and verify a release outside the live directory, stop or drain the service, replace only the binary and deployment-owned `config.yaml`, preserve `logs/`, then restart and verify startup, readiness, and revision. Store the previous binary/config outside the live service directory for rollback. A deployment check should fail when the top level contains anything other than `<service>`, `config.yaml`, and `logs`.
+
+This layout governs VM/bare-metal and systemd deployments. Container images retain Roze's generated image contract, including `/usr/local/bin/<service>` and `ROZE_CONFIG_PATH=/etc/roze/config.yaml`; do not force the `/opt` host layout into a container image.
+
 ## Production And Smoke Verification
 
 Roze 1.x provides stable public APIs, CLI commands, generated layouts, configuration schemas, metrics/events, and documented runtime ordering under Semantic Versioning. Operational evidence is independent: stable API does not mean every workload, dependency topology, or failure mode is battle-tested. Pin the Roze Git revision or signed tag, inspect generated diffs, run smoke/release gates, and only make long-run production claims when the maturity matrix and production evidence link passing artifacts.

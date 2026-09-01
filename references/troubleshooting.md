@@ -100,6 +100,10 @@ Symptom: logging config fails after upgrade or rotated/audit records disappear.
 
 Replace removed `file_name` and `compress_rotated` fields atomically with `file_name_pattern` and `compression`; logging file config rejects unknown fields in every profile. Hourly/daily patterns require exactly one `{date}` token, while `rotation: never` forbids it. Keep `TracingGuard` alive through shutdown, inspect `roze_log_lines_dropped_total`, and use a dedicated non-lossy `logging.audit` sink for `roze.audit` events when audit durability is required.
 
+Symptom: a VM/systemd service starts from the wrong config, cannot write logs, or accumulates release files under `/opt`.
+
+Restore the minimal `/opt/<service>/` layout: executable `<service>`, `config.yaml`, and `logs/` only. Set `WorkingDirectory=/opt/<service>`, `ExecStart=/opt/<service>/<service>`, and `ROZE_CONFIG_PATH=/opt/<service>/config.yaml`; make only `logs/` writable by the service account. Keep systemd units, secrets, staging files, release archives, and rollback copies outside the live service directory. Do not apply this host layout to generated container images.
+
 Symptom: external DTM compatibility, startup, or release-revision checks fail.
 
 Confirm the application pins a full `roze-dtm` revision, then run `python scripts/check-roze-dtm-compatibility.py --dtm-dir ../roze-dtm --output <report>` from the matching Roze checkout. Compare typed `expected_revision` with `GET /api/dtmsvr/version`'s `release_revision`; do not fix a mismatch by following DTM `main` or copying coordinator code into the service. Use `--require-roze-head` only when the coordinated upgrade requires DTM's Roze pin to equal the current Roze commit, and run recovery/failure evidence in the DTM repository.
