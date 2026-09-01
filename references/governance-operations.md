@@ -145,24 +145,33 @@ Deploy DTM as a separate workload with explicit TLS/trust roots, bearer scope, n
 
 ## VM And Systemd Deployment Layout
 
-Deploy every host-based service under `/opt/<service>/`. The directory name and executable name must equal the service name. Its top level contains exactly two files and one directory:
+Every deployment must declare a canonical project name and service name. Use lowercase kebab-case for both. The project name groups related services under `/opt/<project-name>/`; the service name identifies one executable and is the top-level `name` in that service's deployment-owned `config.yaml`.
+
+Deploy each host-based service under `/opt/<project-name>/<service-name>/`. The service directory contains exactly two files and one directory:
 
 ```text
-/opt/match-ws/
-  match-ws
-  config.yaml
-  logs/
+/opt/one-auth/
+  <service-name>/
+    <service-name>
+    config.yaml
+    logs/
 ```
 
-Use `/opt/match-ws` as the canonical example. For another service, replace both `match-ws` occurrences with that service's name. Set the process working directory to `/opt/<service>`, execute `/opt/<service>/<service>`, and set `ROZE_CONFIG_PATH=/opt/<service>/config.yaml` explicitly even though the local default is `config.yaml`.
+For this project, the project root is `/opt/one-auth/`. Each immediate child directory is one service named `<service-name>`, and its config path is `/opt/one-auth/<service-name>/config.yaml`. The matching deployment config must declare the service name:
 
-Do not place source code, `Cargo.toml`, shell scripts, `.env` files, PID files, release archives, checksums, temporary downloads, backups, or versioned release directories inside the service directory. Keep the systemd unit under `/etc/systemd/system/`, secrets in an approved external secret/file location, and release plus rollback artifacts in a deployment-owned staging/archive location outside `/opt/<service>`.
+```yaml
+name: <service-name>
+```
 
-Create `logs/` before startup and make only that directory writable by the service account. Keep the binary executable and non-writable by the service process; keep `config.yaml` read-only with the narrowest practical group access. When Roze file logging or audit logging is enabled, resolve its directories under `/opt/<service>/logs/`; otherwise the platform may collect stdout while the required `logs/` directory remains available.
+For any project, set `WorkingDirectory=/opt/<project-name>/<service-name>`, `ExecStart=/opt/<project-name>/<service-name>/<service-name>`, and `Environment=ROZE_CONFIG_PATH=/opt/<project-name>/<service-name>/config.yaml`. Name the systemd unit `<project-name>-<service-name>.service` so services with the same local name cannot collide across projects.
 
-Stage and verify a release outside the live directory, stop or drain the service, replace only the binary and deployment-owned `config.yaml`, preserve `logs/`, then restart and verify startup, readiness, and revision. Store the previous binary/config outside the live service directory for rollback. A deployment check should fail when the top level contains anything other than `<service>`, `config.yaml`, and `logs`.
+Do not place source code, `Cargo.toml`, shell scripts, `.env` files, PID files, release archives, checksums, temporary downloads, backups, or versioned release directories inside a live service directory. Keep the systemd unit under `/etc/systemd/system/`, secrets in an approved external secret/file location, and release plus rollback artifacts in a deployment-owned staging/archive location outside `/opt/<project-name>/<service-name>`.
 
-This layout governs VM/bare-metal and systemd deployments. Container images retain Roze's generated image contract, including `/usr/local/bin/<service>` and `ROZE_CONFIG_PATH=/etc/roze/config.yaml`; do not force the `/opt` host layout into a container image.
+Create `logs/` before startup and make only that directory writable by the service account. Keep the binary executable and non-writable by the service process; keep `config.yaml` read-only with the narrowest practical group access. When Roze file logging or audit logging is enabled, resolve its directories under `/opt/<project-name>/<service-name>/logs/`; otherwise the platform may collect stdout while the required `logs/` directory remains available.
+
+Stage and verify a release outside the live directory, stop or drain the service, replace only the binary and deployment-owned `config.yaml`, preserve `logs/`, then restart and verify startup, readiness, and revision. Store the previous binary/config outside the live service directory for rollback. A deployment check must fail when the configured service `name`, service-directory basename, binary, or systemd service component differ, or when the service directory contains anything other than `<service-name>`, `config.yaml`, and `logs`.
+
+This layout governs VM/bare-metal and systemd deployments. Container images retain Roze's generated image contract, including `/usr/local/bin/<service-name>` and `ROZE_CONFIG_PATH=/etc/roze/config.yaml`; do not force the `/opt` host layout into a container image.
 
 ## Production And Smoke Verification
 

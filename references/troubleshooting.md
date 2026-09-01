@@ -102,7 +102,7 @@ Replace removed `file_name` and `compress_rotated` fields atomically with `file_
 
 Symptom: a VM/systemd service starts from the wrong config, cannot write logs, or accumulates release files under `/opt`.
 
-Restore the minimal `/opt/<service>/` layout: executable `<service>`, `config.yaml`, and `logs/` only. Set `WorkingDirectory=/opt/<service>`, `ExecStart=/opt/<service>/<service>`, and `ROZE_CONFIG_PATH=/opt/<service>/config.yaml`; make only `logs/` writable by the service account. Keep systemd units, secrets, staging files, release archives, and rollback copies outside the live service directory. Do not apply this host layout to generated container images.
+Restore the minimal `/opt/<project-name>/<service-name>/` layout: `<service-name>` is a directory whose only entries are executable `<service-name>`, `config.yaml`, and `logs/`. Confirm `config.yaml` declares the same service `name`, then align `WorkingDirectory`, `ExecStart`, `ROZE_CONFIG_PATH`, and `<project-name>-<service-name>.service`. For `one-auth`, the config path is `/opt/one-auth/<service-name>/config.yaml`. Make only `logs/` writable by the service account, and keep units, secrets, staging files, release archives, and rollback copies outside the live service directory. Do not apply this host layout to generated container images.
 
 Symptom: external DTM compatibility, startup, or release-revision checks fail.
 
