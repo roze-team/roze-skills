@@ -4,7 +4,7 @@ Use this reference for model generation, repository ownership, ORM choices, data
 
 ## Model Generation
 
-The independently versioned [`roze-ent`](https://github.com/roze-team/roze-ent) library is the single source of truth for model schema parsing, normalization, SQL/Mongo inspection, and SeaORM/Toasty/MongoDB rendering. `rozectl model` pins one `roze-ent` revision and acts only as the CLI/project host for dependency selection, service-context wiring, transactional staging, formatting, and validation. Change parser, inspector, or renderer behavior in `roze-ent`; change only CLI adaptation and Roze project wiring in `apps/rozectl`.
+The independently versioned [`roze-ent`](https://github.com/roze-team/roze-ent) library is the single source of truth for model schema parsing, normalization, SQL/Mongo inspection, SeaORM/Toasty/MongoDB rendering, and structured project requirements. Requirements contract v2 declares dependency names, Cargo-compatible versions, features, and runtime capabilities. `rozectl model` pins one `roze-ent` revision and consumes that contract as the CLI/project host for dependency-source selection, service-context wiring, transactional staging, formatting, and validation. Change parser, inspector, renderer, or requirement behavior in `roze-ent`; change only CLI adaptation and Roze project wiring in `apps/rozectl`.
 
 Generate models from SQL DDL:
 
@@ -42,7 +42,7 @@ Use `--schema` to disambiguate shared table names. For Mongo, `--schema` is the 
 
 ## ORM Choices
 
-SeaORM is the default SQL model scaffold:
+For SQL model output, SeaORM is the default scaffold:
 
 ```bash
 rozectl model generate example/user.sql --out services/user-api --format sql
@@ -54,7 +54,7 @@ Generate Toasty-style modules explicitly instead:
 rozectl model generate example/user.sql --out services/user-api --format sql --orm toasty
 ```
 
-On `--update`, omit `--orm` to inherit the generated ORM marker from `src/model/mod.rs`. Legacy projects can be inferred from an unambiguous `Cargo.toml` dependency. If the ORM cannot be determined, generation must stop and require explicit `--orm`. Switching an existing model scaffold between Toasty and SeaORM requires both `--orm <target>` and `--switch-orm`; review the generated file/dependency diff and preserve `src/model/*_ext.rs`.
+On SQL `--update`, omit `--orm` to inherit the generated ORM marker from `src/model/mod.rs`. Legacy projects can be inferred from an unambiguous `Cargo.toml` dependency. If the ORM cannot be determined, generation must stop and require explicit `--orm`. Switching an existing SQL model scaffold between Toasty and SeaORM requires both `--orm <target>` and `--switch-orm`; review the generated file/dependency diff and preserve `src/model/*_ext.rs`. Mongo generation and update do not require ORM selection.
 
 Generated REST/API services do not depend on database crates by default. Add models only when the application needs persistence.
 
@@ -166,6 +166,8 @@ Important SQL type mappings:
 - PostgreSQL SQL import recognizes named or anonymous table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK` constraints without inventing a `constraint` column. Composite primary and foreign keys remain unsupported and must fail clearly; recognized checks are not projected into generated validation.
 
 Mongo inspection samples collection documents for field and type inference, maps `_id` to `id`, preserves unique/index metadata, emits helpers for unique and compound indexes, and can generate an `ObjectId` id model for empty collections.
+
+Mongo generation and inspection also apply project-level wiring from the `roze-ent` requirements contract. When the output has a `Cargo.toml`, `rozectl` records `[package.metadata.roze.model] backend = "mongo"`, merges required dependency versions and features using the project's existing workspace, path, or pinned Git source, and adds the declared direct `roze-mongo` dependency. For generated services, it adds an optional `roze_mongo::MongoDatabase` to `ServiceContext`, connects it through `roze_mongo::connect_optional`, registers the `mongo` health dependency, and exposes the generated model context hook. Later REST/RPC updates use the package metadata to restore this wiring. Do not hand-edit these generated manifest, model-context, or service-context sections; regenerate with the current `rozectl`.
 
 SQL and inspect imports infer soft-delete columns from `deleted`, `is_deleted`, `deleted_at`, `delete_time`, or `deleted_at_millis`, and tenant columns from `tenant_id`, `org_id`, or `account_id`, then write those decisions into `schema.ent`. `.ent` schemas can declare them explicitly with `soft_delete <field>` and `tenant <field>`.
 

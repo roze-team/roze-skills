@@ -201,13 +201,17 @@ Symptom: outbox delivery waits for every fixed poll or spins while a backlog exi
 
 Use `roze_transaction::run_outbox_relay` instead of a hand-written fixed sleep around `relay_outbox_batch`. Configure positive `interval_ms` and `max_idle_interval_ms >= interval_ms`; local enqueues notify the relay, empty polls back off, and non-empty batches drain immediately. Keep bounded polling for cross-process inserts and missed notifications.
 
-Symptom: model generation chooses the wrong ORM during update.
+Symptom: SQL model generation chooses the wrong ORM during update.
 
-SeaORM is the default only for new model scaffolds. On update, omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold.
+SeaORM is the default only for new SQL model scaffolds. On SQL update, omit `--orm` to inherit the existing generated marker when it is present. For legacy projects, check whether `Cargo.toml` has an unambiguous Toasty or SeaORM dependency. If changing ORM intentionally, pass both `--orm <target>` and `--switch-orm`; otherwise the generator should stop instead of silently rewriting the scaffold. Mongo generation and update do not require `--orm`.
+
+Symptom: Mongo generation is missing `roze-mongo`, the model context hook, or `ServiceContext` connection and health wiring.
+
+Regenerate with a current `rozectl`. The pinned `roze-ent` project-requirements contract must declare the direct dependency, compatible version/features, and the Mongo connection, health registration, and model context capabilities. Check that `Cargo.toml` contains `[package.metadata.roze.model]` with `backend = "mongo"`; REST/RPC `--update` uses this marker to restore generated Mongo wiring. Fix requirement declarations in `roze-ent` or host consumption in `apps/rozectl` instead of patching generated project files.
 
 Symptom: a model parser, database inspector, or renderer fix in `apps/rozectl` has no effect or duplicates logic.
 
-Make schema parsing, normalization, SQL/Mongo inspection, and SeaORM/Toasty/MongoDB rendering changes in the pinned `roze-ent` repository. Keep `apps/rozectl` limited to CLI adaptation, Roze dependency selection, service-context wiring, staging, formatting, and validation; then update the pinned `roze-ent` revision and run both upstream and adapter tests.
+Make schema parsing, normalization, SQL/Mongo inspection, SeaORM/Toasty/MongoDB rendering, and structured dependency/runtime requirements changes in the pinned `roze-ent` repository. Keep `apps/rozectl` limited to consuming that versioned contract for CLI adaptation, Roze dependency selection, service-context wiring, staging, formatting, and validation; then update the pinned `roze-ent` revision and run both upstream and adapter tests.
 
 Symptom: generated Cargo manifests mix floating and pinned canonical Roze Git dependencies.
 
