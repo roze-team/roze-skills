@@ -24,7 +24,7 @@ This repository packages Roze project conventions, `rozectl` workflows, generate
 - Native WebSocket route generation, Roze WebSocket runtime API, client address extraction, and trusted proxy policy
 - Reporting and chart endpoint contracts backed by Roze report/query primitives and preserved `src/application.rs` data-source hooks
 - Independent `roze-ent` model parser/inspector/renderer and structured project-requirements ownership, `rozectl` dependency/runtime host wiring, Mongo service-context restoration, `.ent` model source guidance, and ent-style query/create/update/delete/conditional-update/projection/aggregate/hook/policy/mixin builders
-- Rust engineering guidance for ownership, lifetimes, errors, async/concurrency, lifecycle, dependencies, performance, unsafe review, web/cloud-native service constraints, refactoring, and review
+- BeautifulRust-aligned Rust engineering guidance adapted to Roze, with merged core rules plus dedicated review, behavior-preserving porting, and complete Cargo/clippy lint-policy references
 - SeaORM-default and explicit Toasty model generation patterns, including direct `serde` derive dependencies, workspace-aware manifests, scoped SeaORM model transactions and row locks, primary/replica read selection, key-preserving SQLite writes, portable string predicates, `update_where()` optimistic locking, SQL table constraints, explicit `.ent` `RozeShard` database sharding, and generated routed model accessors
 - Elasticsearch, OpenSearch, and Meilisearch search generation patterns with typed filters/sorts/pages, lifecycle tasks, multi-schema updates, and dependency-pin inheritance
 - Config, typed top-level application config, strict production config validation, SQL logging/slow-query policy, database direct/proxy/sharded modes, registry, gateway native HTTP governance, REST/RPC/Gateway rate limiting and isolated circuit breakers, MQ/job governance, adaptive persistent outbox relay, cache, Redis topology, Qiniu Kodo/S3-compatible storage, external DTM integration, minimal `/opt/<project-name>/<service-name>` VM/systemd layout, metrics, tracing, release gates, generated production reference systems, competitive benchmarks, production release audits, production evidence verification/promotion, and smoke/soak checks
@@ -77,6 +77,10 @@ roze-skills/
     ai-patterns.md
     governance-operations.md
     rust-engineering.md
+    rust-review.md
+    rust-porting.md
+    rust-lints.md
+    rust-bevy.md
     troubleshooting.md
 ```
 

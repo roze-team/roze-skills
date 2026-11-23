@@ -2,7 +2,15 @@
 
 Use this reference for Rust language and ecosystem decisions inside Roze crates, `rozectl` generators, generated REST/RPC services, and application-owned Roze code.
 
-This guidance is adapted for Roze from useful patterns in `actionbook/rust-skills`. Keep Roze behavior first: if Roze has a generated extension point or `roze-*` helper for the problem, use that before adding generic Rust infrastructure.
+This is the BeautifulRust-aligned source of truth for general Rust decisions in Roze, synchronized from [`morganlinton/BeautifulRust`](https://github.com/morganlinton/BeautifulRust) baseline `b9718436` and merged with Roze-specific guidance previously adapted from `actionbook/rust-skills`. BeautifulRust governs general Rust style and API quality; active Roze contracts govern generated ownership, framework APIs, wire compatibility, lifecycle, and built-in infrastructure.
+
+## Mindset And Scope
+
+- Write Rust-shaped code: ownership and `Drop` for resources, `Option` for absence, `Result` for recoverable failure, traits/enums for polymorphism, and types for invariants. Do not transliterate inheritance, exception, manager/factory, manual-memory, or global-state patterns.
+- Make invalid states unrepresentable where practical. Validate once at construction and expose operations that preserve the invariant.
+- Distinguish application code from reusable library/framework code. Application code should be concrete and direct; public libraries require stronger type, documentation, error, SemVer, and future-evolution discipline.
+- Let rustfmt own formatting, clippy catch mechanical issues, and the compiler enforce memory safety. Spend review attention on behavior, contracts, soundness, cancellation, and architecture.
+- Prefer the standard library and active Roze built-ins before dependencies or local infrastructure. Do not use a general Rust style preference to override `.api`/`.proto`/`.ent` contracts or documented generated extension points.
 
 ## Ownership And Lifetimes
 
@@ -17,6 +25,17 @@ Common decision points:
 - Use `Cow<'_, str>` only when borrowed data may need mutation or normalization.
 - Clone value objects when duplication is domain-correct. Do not add `.clone()` only to silence ownership errors.
 
+When a borrow fails, try these in order before shared ownership or cloning:
+
+1. Bind a temporary to extend its lifetime or narrow an existing borrow with a block.
+2. Split a long expression into typed intermediate values.
+3. Move a field with `mem::take`, `mem::replace`, or `Option::take`.
+4. Split a large state object so disjoint data can be borrowed independently.
+5. Clone small immutable data deliberately when duplication is semantically correct.
+6. Use indices, arenas, or `Rc`/`Arc` plus interior mutability only when sharing is part of the design. Avoid self-referential structs.
+
+Prefer owned data in structs unless borrowing is essential to the abstraction. Descriptive lifetimes such as `'src` or `'conn` help on long-lived types; simple functions can use short lifetimes or elision. Build with local mutation, then expose immutable state after setup.
+
 Error-oriented checks:
 
 - `E0382` moved value: decide whether ownership should transfer, be borrowed, or be shared.
@@ -29,6 +48,59 @@ Roze-specific notes:
 - Generated DTOs can usually be owned. Avoid overfitting lifetimes into generated types unless the active generator already supports that style.
 - `ServiceContext` should own long-lived clients, pools, registries, caches, and config snapshots.
 - Do not store request-scoped borrows in application-wide state.
+- A cheaply cloned client may hide `Arc<Inner>` internally; callers should not need to manage the ownership wrapper unless it is part of the Roze API contract.
+
+## Rust-Shaped Types And APIs
+
+### Naming And Conversions
+
+- Use `UpperCamelCase` for types, traits, and variants; `snake_case` for functions, methods, modules, and locals; `SCREAMING_SNAKE_CASE` for constants/statics. Treat acronyms as words: `HttpClient`, `Uuid`.
+- Getters omit `get_`: use `name()`, `name_mut()`, `set_name(...)`, and `take_name()`. Use `get` only when there is one obvious value, as with `Cell::get`.
+- Conversion names communicate cost and ownership: `as_` is a cheap borrowed view, `to_` creates an owned value or otherwise performs work, and `into_` consumes `self`. Use `_unchecked` only for unsafe/unchecked siblings with a checked alternative.
+- Use `new` for the primary constructor, `try_new` when validation can fail, `with_capacity` or `new_with_*` for clear variants, and domain verbs such as `open` or `connect` for I/O resources.
+- Name iterators `Iter`, `IterMut`, and `IntoIter`. If a collection exposes `len()`, also expose `is_empty()`.
+- Avoid vague suffixes such as `Manager`, `Factory`, `Helper`, or `Util` when a domain name describes the responsibility. Do not repeat the module name in the type.
+
+Model domain invariants with Rust types instead of comments and conventions:
+
+- Use enums for mutually exclusive modes and public boolean choices, newtypes for IDs or units that must not mix, `Option<T>` for absence, and data-carrying enum variants for state-specific data. Avoid sentinel values such as `-1` or empty strings.
+- Use the strongest standard type that fits the domain, such as `Path`/`PathBuf` for paths, `Duration` for elapsed time, and `NonZero*` for internal non-zero invariants. Keep wire DTO types dictated by `.api`/`.proto` contracts and convert at the application boundary.
+- Prefer named fields over positional tuples except for single-field newtypes and very local code. Use fallible constructors, `TryFrom`, or `FromStr` when construction validates an invariant.
+- Add `#[repr(transparent)]` to a single-field newtype only when layout compatibility is part of the contract.
+- Use independent bit flags only when choices can combine; use an enum when exactly one choice is valid.
+- Application-owned Roze code should stay concrete and direct. Framework/library APIs need stricter evolution discipline: private fields by default, narrow visibility, stable error types, and `#[non_exhaustive]` for extensible public enums or public-field structs when exhaustive matching is not part of the contract.
+
+Design public APIs around ownership and cost:
+
+- Accept `&str`, `&[T]`, `&Path`, `&T`, or `Option<&T>` rather than `&String`, `&Vec<T>`, `&PathBuf`, `&Box<T>`, or `&Option<T>`. `AsRef`/`IntoIterator` can broaden frequently used library inputs; application code should prefer direct concrete inputs. Take `T` by value when the callee stores or consumes it instead of borrowing and cloning internally.
+- Keep `Arc`, `Rc`, `RefCell`, locks, and third-party implementation types out of public signatures unless sharing or interoperability is itself the contract. Roze-generated context and client surfaces are explicit exceptions when the active framework API owns that shape.
+- Use `as_` for cheap borrowed views, `to_` for owned conversion, and `into_` for consuming conversion. Implement `From`/`TryFrom` and `FromStr` instead of ad hoc conversion names.
+- Derive applicable standard traits deliberately. Public types normally need `Debug`, with secrets redacted; derive `Clone` only when duplication is valid and `Copy` only for small plain values. Do not ship `PartialOrd` without `Ord` when a total order exists. Error types need `Display` and `std::error::Error`; zero-argument `new()` and `Default` should agree. If `Ord`, `Eq`, or `Hash` is handwritten, they must compare the same semantic fields. Add `#[must_use]` when discarding a returned value/type is almost certainly a bug.
+- Avoid public boolean parameters. Prefer a named enum or separate methods so call sites remain readable and a third mode can be added safely.
+- Use a builder when several optional values or cross-field validation make constructors unclear. Keep simple constructors simple; do not add genericity, traits, or builders speculatively.
+- Up to a couple of optional values can use named constructors. For larger or cross-validated configuration, use a builder whose setters name fields and whose `build() -> Result<_, _>` performs all validation. Group four or more loose primitive arguments into semantic types.
+
+### Traits, Generics, And Evolution
+
+- Implement `From`/`TryFrom`, not `Into`/`TryInto` directly. Implement `FromIterator`, `Extend`, and owned/borrowed `IntoIterator` only when the type is genuinely collection-like.
+- Implement `Deref` only for smart-pointer or owning-collection behavior, never to simulate inheritance. Overload operators only for their conventional mathematical/domain meaning.
+- Put trait bounds on the `impl` or function that needs them rather than on the type definition when derivation and storage do not require the bound.
+- Define a trait for generic/dynamic dispatch or an extension trait, not merely to group methods. Keep essential operations as inherent methods and required trait methods minimal; derive default behavior from the minimal core.
+- If an operation has a natural receiver, make it a method; use a free function for computations without one. Keep associated functions primarily for construction and type-level operations.
+- Prefer concrete types, then generics/`impl Trait`, then `dyn Trait`. Use trait objects for runtime heterogeneity or binary-size concerns, ideally behind a domain wrapper. Avoid deeply nested generic service types.
+- Decide object safety intentionally. Put methods unavailable to trait objects behind `where Self: Sized`.
+- Seal traits when downstream implementations would prevent safe evolution, and document that decision.
+- Use the least restrictive closure bound that matches use: `FnOnce`, then `FnMut`, then `Fn`. Put a closure parameter last and avoid APIs with several unrelated callbacks.
+- Keep parameter ordering consistent across related APIs: operation-specific inputs first and ubiquitous context/configuration last, unless an established Roze signature dictates otherwise.
+- Reach for a macro only after functions, generics, and traits cannot express the operation. Prefer `macro_rules!` to a proc macro when it is sufficient, keep input recognizable, and do not hide changes to a type's kind or function signature.
+- Expose each public item at one canonical path. Avoid leaking dependency types; feature-gate optional integrations and re-export a dependency type only when callers must name the exact compatible version.
+- Return iterators from reusable library APIs when eager collection is unnecessary. Use an opaque iterator internally or a named wrapper when a public concrete iterator type would freeze implementation details.
+- Features are additive and bare-named (`std`, `serde`, `test-util`). A feature must not remove or change an existing public item, field, or trait method.
+- Keep reusable mocks/fakes behind a `test-util` feature when downstream integration tests need them; do not make production `Default` constructors perform I/O.
+- Adding enum variants, public struct fields, trait bounds, or required trait methods can be breaking. Use `#[non_exhaustive]`, sealing, defaults, deprecation, and major releases deliberately rather than after the compatibility problem appears.
+- Mark an API `const` only when maintaining const evaluation is a compatibility commitment. Do not expose implementation-only error kinds or fields that callers cannot act on.
+
+Roze uses generated `src/logic/prelude.rs` and REST group preludes as intentional extension points. Do not apply generic "no prelude" advice to those files, and do not replace generated DTOs or public protocol enums merely to satisfy a style preference.
 
 ## Error Handling
 
@@ -42,6 +114,21 @@ Use:
 - `expect("specific invariant")` only when the invariant is truly guaranteed.
 - `panic!`, `assert!`, and `unreachable!` for programmer bugs or impossible states, not operational failures.
 
+Panics are not exceptions. Do not use `catch_unwind` for ordinary control flow or continue a library after an arbitrary panic. Pair a justified panicking convenience with a fallible API when callers can reasonably recover, and document reachable panic conditions.
+
+- Every intentional `expect`, `assert!`, or `panic!` message should explain the invariant and include relevant values when useful. Prefer `expect("config is loaded before workers start")` over `unwrap()`.
+- Pattern-match instead of check-then-unwrap. Use `if let`, `match`, or `let Some(value) = value else { ... };`.
+- Treat a poisoned lock as a violated invariant unless the application has a proven recovery protocol; do not casually continue with `into_inner()`.
+- Destructors must not block, panic, or report recoverable failure. Provide an explicit consuming `close`/`shutdown` method when teardown can fail, and let `Drop` perform bounded best-effort cleanup.
+
+For public library errors:
+
+- Use a focused enum or struct implementing `Debug`, `Display`, `std::error::Error`, and normally `Send + Sync + 'static`. Preserve wrapped causes through `source()`/`#[source]` and `From` conversions.
+- Do not expose `()`, `String`, `Box<dyn Error>`, or `anyhow::Error` when callers need structured recovery. Application internals may use contextual `anyhow`/`eyre` style errors before mapping at the boundary.
+- Keep display text concise, lowercase, and without trailing punctuation. Include paths, values, and operation context needed to diagnose the failure without exposing secrets.
+- Do not create one crate-wide enum containing unrelated failure domains. Expose only distinctions callers can act on; keep implementation-only kinds private.
+- If a fallible consuming operation can reasonably be retried, consider returning the consumed value through the error instead of forcing a clone.
+
 Roze-specific rules:
 
 - Prefer Roze error/result helpers at protocol boundaries: `RozeError`, `roze-result::ApiResponse`, and `roze_rpc::rpc::status_from_error`.
@@ -49,6 +136,7 @@ Roze-specific rules:
 - Categorize errors by recovery: validation/user errors, not found, auth/permission, transient upstream, timeout, rate limited, config invalid, and internal.
 - Retry only transient errors. Use Roze governance/retry/breaker surfaces before local retry loops.
 - Add context to internal errors before converting them to user-facing HTTP/gRPC shapes.
+- Keep response messages stable and safe while retaining detailed causes for structured internal logs and metrics.
 
 Avoid:
 
@@ -70,6 +158,12 @@ Use:
 - atomics for simple counters and flags.
 - channels for ownership transfer and background worker coordination.
 
+Prefer message passing when ownership transfer matches the workflow. When state must be shared, keep linked invariants under one lock, keep lock scopes short, never invoke user-provided callbacks while holding a lock, and do not return lock guards from public APIs.
+
+Public clients and service futures should be `Send` and normally `Sync` where their documented use requires it. Pin important assumptions with compile-time assertions so a refactor cannot silently make a generated/native HTTP or tonic future non-`Send`.
+
+Use `async fn` for ordinary asynchronous APIs. Return `impl Future` only when trait constraints or deliberate pre-poll setup require it. Runtime-neutral reusable libraries should accept I/O traits, executors, or spawn functions rather than secretly creating threads or assuming a particular runtime; Roze runtime crates and generated services may intentionally use the workspace Tokio lifecycle.
+
 Roze-specific rules:
 
 - Generated REST handlers and RPC servers run in async contexts; do not block the executor with filesystem, CPU-heavy, sleep, or synchronous network calls.
@@ -83,6 +177,7 @@ Common pitfalls:
 - `thread::sleep` in async code: use `tokio::time::sleep`.
 - `future is not Send`: ensure non-`Send` values are dropped before `.await`, use `Arc`, or keep the work local only when the runtime design allows it.
 - deadlocks: keep lock ordering explicit and scopes short.
+- long CPU loops in async tasks: move them to `spawn_blocking`/workers or yield cooperatively when chunking is the intended design.
 
 ## Resource Lifecycle
 
@@ -102,6 +197,20 @@ Roze-specific rules:
 - Let generated startup/config code define lifecycle boundaries where possible.
 - Do not create expensive clients per request unless the active Roze pattern requires it.
 
+## Idioms And Clarity
+
+- Prefer short iterator pipelines when they read top-to-bottom; use an explicit `for` loop when the body has multiple responsibilities, complex early exits, or would become a long combinator chain.
+- Use `Option`/`Result` combinators when they clarify one transformation, and `match` or `let ... else` when branches carry distinct behavior. Never use check-then-unwrap.
+- Build strings with `format!`, `write!`, `push_str`, or `push` rather than chained `+`. For hot buffers, reuse capacity only after measurement shows it matters.
+- Bind cleanup guards to a name such as `_guard`; `let _ = guard` drops immediately. Keep lock and transaction guards visibly scoped.
+- Make types explicit when `.into()`, `.parse()`, `.collect()`, or a complex iterator result would otherwise hide intent.
+- For closures that need a mix of borrowed and owned captures, clone/rebind the owned values in a small block and then use `move`; do not clone unrelated state into the closure.
+- Import types and traits for unqualified use, but usually qualify free functions by module (`mem::take`, `fs::read`). Avoid glob imports except documented framework preludes, enum variants inside a local match-heavy scope, and `use super::*` in tests.
+- Replace unexplained magic values with named constants whose docs state their source and operational effect.
+- Keep externally visible output deterministic. Sort map-derived output or choose an ordered representation when order is part of logs, generated files, CLI output, snapshots, or tests.
+- Use structured `tracing` events in services and libraries. Reserve stdout/stderr for a CLI's intentional user-facing output; do not leave `dbg!` or incidental prints in production paths.
+- Comments explain invariants, trade-offs, and why a workaround exists. Do not narrate obvious statements or preserve an implementation diary in code.
+
 ## Dependencies And Cargo
 
 Before adding a dependency, check whether Roze or the standard library already provides the capability.
@@ -117,6 +226,13 @@ Selection criteria:
 - compatible with the workspace MSRV and async runtime
 - no duplicate major versions of core dependencies
 
+Crate and module structure:
+
+- Keep workspace crates single-purpose and flat under the repository's established layout. Split on a real ownership/build boundary, not merely because a module is long.
+- Name a leaf module after its primary concept. Group modules by domain/use case rather than dumping items into `traits`, `helpers`, or `utils` buckets.
+- Keep non-leaf module files focused on declarations and deliberate re-exports. Do not invent a general prelude; preserve Roze's generated application preludes as explicit framework extension points.
+- Share versions and lint policy through workspace tables when the active checkout does so. Commit `Cargo.lock` for binaries/applications and follow the repository policy for libraries.
+
 Roze-specific rules:
 
 - Prefer existing workspace crates and `roze-*` abstractions over adding external crates.
@@ -124,16 +240,41 @@ Roze-specific rules:
 - Use workspace dependency versions when the Roze checkout defines them.
 - Avoid wildcard versions.
 - Be careful with default features on network, TLS, database, metrics, and async crates.
+- Prefer normal compatible version ranges over wildcard or needless exact pins. Preserve exact Git revisions where Roze reproducibility contracts require them.
+- Audit dependency duplication, licenses, advisories, unused dependencies, build scripts, and proc macros proportionate to release risk.
+- Set an MSRV only when CI continuously verifies it. The Roze toolchain pin is a reproducibility contract, not automatically an MSRV promise.
+- Do not run hidden initialization before `main`, and do not add unstable features to a stable-toolchain workspace.
 
 Useful checks:
 
 ```bash
 cargo tree -p <crate>
 cargo tree -d
+cargo audit
+cargo deny check
 cargo check -p <crate>
 cargo test -p <crate>
 cargo clippy -p <crate> --all-targets -- -D warnings
 ```
+
+## Tooling And Lint Policy
+
+Scale verification to the changed surface, then broaden it for shared or public behavior:
+
+```bash
+cargo fmt --check
+cargo clippy -p <crate> --all-targets --all-features -- -D warnings
+cargo test -p <crate>
+cargo doc -p <crate> --no-deps
+```
+
+Use [rust-lints.md](rust-lints.md) as the complete BeautifulRust machine-checkable baseline. Reconcile it with the active Roze workspace rather than creating duplicate tables or breaking generated/protocol-required shapes.
+
+- Enforce warnings as errors in CI commands, not with `#![deny(warnings)]` in source; a new toolchain warning should not make an otherwise unchanged crate unbuildable outside the controlled CI lane.
+- Fix a lint when practical. For an intentional local exception, prefer the narrowest `#[expect(lint, reason = "...")]` supported by the pinned toolchain so stale suppressions are detected. Use `#[allow]` primarily for generated or macro-expanded code that cannot use `expect` reliably.
+- Keep lint configuration at the workspace or crate manifest boundary instead of scattering crate-level attributes.
+- Treat clippy as mechanical evidence, not design proof. Review public contracts, generated ownership, error semantics, cancellation, and deterministic behavior separately.
+- Run `cargo doc --no-deps` for reusable/public API changes so broken links and rustdoc examples are part of handback evidence.
 
 ## Performance
 
@@ -154,6 +295,11 @@ Useful patterns:
 - Batch I/O and database/search operations where Roze repositories or clients support it.
 - Prefer sequential `Vec` access over hash maps for small collections.
 - Use Roze cache and singleflight helpers for hot-key paths.
+- Use `Box<[T]>`, `Box<str>`, or `Arc<str>` for long-lived immutable data when their ownership model and measured allocation profile fit better than growable collections.
+- Reserve capacity when a reliable size is known and consider `shrink_to_fit` only for long-lived collections whose excess capacity is materially measured.
+- Reuse caller-owned buffers in proven hot APIs, batch work instead of locking or performing I/O per item, and choose a faster hasher only for trusted keys after profiling.
+- Derive `Copy` only for small plain values where implicit copying is unsurprising. Do not make large buffers or secret/key material silently copyable.
+- Change the global allocator only at the application boundary and only with benchmark evidence across representative workloads.
 
 Avoid:
 
@@ -161,6 +307,25 @@ Avoid:
 - benchmarking debug builds
 - using `HashMap` or heap allocation for tiny fixed-size data by habit
 - adding `unsafe` for performance before measuring safe alternatives
+- optimizing a micro-allocation while leaving algorithm, query shape, network round trips, or contention unmeasured
+
+## Documentation And Tests
+
+Public framework APIs and reusable crates should document what signatures cannot express:
+
+- Give public items a concise rustdoc summary. Add `# Examples`, `# Errors`, `# Panics`, and `# Safety` sections when applicable; examples should use `?` rather than copyable `unwrap()` patterns.
+- Use `//!` for crate/module-level public guidance and `///` for items. Keep the first sentence useful in generated listings and order special sections consistently: examples, errors, panics, safety.
+- Document preconditions, side effects, ownership transfer, complexity, cancellation, and compatibility constraints instead of restating the item name.
+- Link Rust items with rustdoc links and keep comments focused on why an invariant is sound or a workaround is required.
+- Hide implementation-only conversion glue from public docs only when users cannot trigger or name it; do not hide relevant compatibility behavior.
+
+Test observable contracts rather than implementation shape:
+
+- Put private-unit tests beside the module and public API behavior in integration tests when that boundary matters. Treat doctests as executable public examples.
+- Add a failing regression test before fixing a bug when feasible. Test properties such as round trips, ordering, idempotency, cancellation, and retry boundaries instead of mirroring branches or constants.
+- Cover supported feature combinations and platform-specific paths proportionate to risk. A feature that changes compilation needs compile evidence in its supported matrix.
+- Make time, randomness, I/O, and network behavior controllable through existing Roze test helpers or narrow injected interfaces. Do not make `Default` perform I/O.
+- Fuzz parsers and untrusted contract inputs when risk justifies it; run Miri for unsafe boundaries that support it. Keep assertions diagnostic with relevant input values.
 
 ## Unsafe And FFI
 
@@ -171,6 +336,8 @@ Only consider `unsafe` for:
 - FFI
 - low-level abstractions with clear invariants
 - measured hot paths where safe alternatives are insufficient
+
+Mark an API `unsafe` only when violating caller obligations can cause undefined behavior, not merely because the operation is destructive or operationally dangerous. Do not use `transmute` to cast enums or extend lifetimes, and do not add `unsafe impl Send/Sync` to silence the compiler.
 
 Required for unsafe code:
 
@@ -206,6 +373,7 @@ Use this checklist before accepting unsafe code in Roze runtime crates, generate
 - Do not manually `Drop` memory owned by foreign code, and do not let Rust automatically drop foreign-owned memory.
 - For `impl Send` or `impl Sync`, verify synchronization, aliasing, and lifetime invariants under concurrent access.
 - Add tests around boundary conditions and run `cargo miri` when the target crate and dependencies support it.
+- A safe wrapper must remain sound for every sequence of safe calls; if callers can trigger undefined behavior without using `unsafe`, the abstraction is unsound regardless of internal comments.
 
 Roze-specific unsafe guidance:
 
@@ -259,7 +427,7 @@ Cloud-native review checklist:
 - Are generated files left generator-owned and business changes kept in application-owned extension points?
 - Are deployment artifacts, smoke scripts, and docs updated when public behavior changes?
 
-## Refactoring And Review
+## Refactoring Existing Rust
 
 For Rust refactors, analyze impact before editing:
 
@@ -268,19 +436,25 @@ For Rust refactors, analyze impact before editing:
 - Check macro-generated code and docs references.
 - Preserve generated Roze files by editing generators/templates instead of generated glue.
 - Keep changes small enough for targeted tests.
+- Characterize undocumented behavior before changing it, especially byte output, ordering, error classification, and public signatures.
+- Preserve quirks that are outside the requested change and call them out instead of silently "cleaning them up."
+- Fix the full class of issue requested, not only the cheapest instance. Keep public behavior stable unless changing it is the task; call out necessary signature or compatibility changes explicitly.
+- When tests are absent, add characterization coverage before structural changes. Keep changes small enough for reviewers to connect each edit to behavior.
 
-Review checklist:
+For review procedure, severity, and report structure, use [rust-review.md](rust-review.md). For cross-language migrations, use [rust-porting.md](rust-porting.md). Those references depend on this file rather than repeating its general Rust rules.
 
-- No production `unwrap()` without a strong invariant.
-- No `.clone()` without data-flow justification.
-- No `String` where `&str` or `Cow<'_, str>` is the correct API.
-- No `Rc`/`RefCell` in async service state.
-- No blocking calls in handlers or RPC methods.
-- No locks held across `.await`.
-- No ignored `Result` or `#[must_use]` values.
-- No public fields that allow invalid state when constructors or methods should enforce invariants.
-- No `unsafe` without safety docs/comments.
-- No custom context/error/metrics/config patterns that bypass Roze conventions.
+## Handback Checklist
+
+- Relevant `cargo fmt --check`, clippy with `-D warnings`, tests, and public-library docs pass, or unavailable checks are named.
+- No reachable production `unwrap`; intentional panic/expect/assert paths explain the invariant and relevant values.
+- Public inputs use borrowed/general standard forms where appropriate, without clone-to-own or leaked ownership wrappers.
+- Domain invariants use types rather than sentinel values or public boolean switches.
+- Public types implement the applicable common traits; error types are structured and retain sources.
+- `Ord`, equality, and hashing agree; externally visible output is deterministic.
+- Async code does not block, hold guards across `.await`, lose cancellation/context, or create unbounded work.
+- Unsafe is necessary, minimal, documented, wrapped safely, and tested at its boundary.
+- Public docs cover errors, panics, safety, side effects, and examples as applicable.
+- Application code remains direct; public library code preserves SemVer; generated files remain generator-owned; Roze built-ins are used before local infrastructure.
 
 ## Anti-Patterns To Watch
 
@@ -293,3 +467,10 @@ Review checklist:
 - Handwritten service-discovery, rate-limit, breaker, cache, or MQ logic when Roze provides it.
 - Premature generic abstractions in generated services.
 - Over-broad `pub` visibility in app modules.
+- Sentinel values, public boolean switches, or loosely related primitive parameters where a domain type should enforce the invariant.
+- `#![deny(warnings)]` in source or broad lint suppressions without a reason.
+- Line-by-line ports that preserve manual memory, exception, global-state, or class patterns instead of behavior.
+
+## Standards Provenance
+
+BeautifulRust synthesizes the Google Rust Style Guide, official Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft Pragmatic Rust Guidelines. This reference merges their operational rules with Roze rather than copying five overlapping digests. When a rule needs deeper rationale or a stable checklist code, consult BeautifulRust's corresponding `skills/rust-best-practices/references/` file at the pinned baseline; when sources disagree, this merged reference and the active Roze contract are authoritative for Roze work.
