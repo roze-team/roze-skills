@@ -11,6 +11,7 @@ The active repository remains authoritative. Reuse an equivalent existing worksp
 - Do not put `#![deny(warnings)]` in source.
 - Fix findings where practical. For intentional exceptions, prefer the narrowest `#[expect(lint, reason = "...")]`; use `#[allow]` for generated/macro code or when the pinned toolchain cannot use `expect` reliably.
 - Do not enable library-only policy blindly for binaries or generated services.
+- Do not enable `clippy::restriction` as a group. Select individual restriction lints deliberately, following the official Clippy guidance for the pinned toolchain.
 
 ## Workspace Lints
 

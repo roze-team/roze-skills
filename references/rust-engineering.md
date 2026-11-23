@@ -2,7 +2,7 @@
 
 Use this reference for Rust language and ecosystem decisions inside Roze crates, `rozectl` generators, generated REST/RPC services, and application-owned Roze code.
 
-This is the BeautifulRust-aligned source of truth for general Rust decisions in Roze, synchronized from [`morganlinton/BeautifulRust`](https://github.com/morganlinton/BeautifulRust) baseline `b9718436` and merged with Roze-specific guidance previously adapted from `actionbook/rust-skills`. BeautifulRust governs general Rust style and API quality; active Roze contracts govern generated ownership, framework APIs, wire compatibility, lifecycle, and built-in infrastructure.
+This is the BeautifulRust-aligned source of truth for idiomatic Rust decisions in Roze, synchronized from [`morganlinton/BeautifulRust`](https://github.com/morganlinton/BeautifulRust) baseline `b9718436` and merged with Roze-specific guidance previously adapted from `actionbook/rust-skills`. Version-matched official language/tool documentation in [rust-official-standards.md](rust-official-standards.md) governs Rust semantics; BeautifulRust governs engineering style and API quality; active Roze contracts govern generated ownership, framework APIs, wire compatibility, lifecycle, and built-in infrastructure.
 
 ## Mindset And Scope
 
@@ -473,4 +473,4 @@ For review procedure, severity, and report structure, use [rust-review.md](rust-
 
 ## Standards Provenance
 
-BeautifulRust synthesizes the Google Rust Style Guide, official Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft Pragmatic Rust Guidelines. This reference merges their operational rules with Roze rather than copying five overlapping digests. When a rule needs deeper rationale or a stable checklist code, consult BeautifulRust's corresponding `skills/rust-best-practices/references/` file at the pinned baseline; when sources disagree, this merged reference and the active Roze contract are authoritative for Roze work.
+BeautifulRust synthesizes the Google Rust Style Guide, official Rust API Guidelines, Effective Rust, Rust Design Patterns, and Microsoft Pragmatic Rust Guidelines. This reference merges their operational rules with Roze rather than copying five overlapping digests. When a rule needs deeper rationale or a stable checklist code, consult BeautifulRust's corresponding `skills/rust-best-practices/references/` file at the pinned baseline. Official version-matched documentation remains authoritative for language/tool semantics; this merged reference and active Roze contracts decide engineering/project policy where official Rust permits multiple choices.

@@ -13,6 +13,7 @@ Before judging code:
 3. Identify generated files and their owner. Review the generator or template when generated output is wrong; do not recommend hand-editing generated glue.
 4. For Roze services, read the relevant `.api`, `.proto`, `.ent`, `roze-service.yaml`, config, and `ServiceContext` wiring before reviewing an adapter in isolation.
 5. Preserve deliberate project conventions and documented quirks. Flag a trade-off rather than treating every difference from a general style guide as a defect.
+6. When a finding depends on language, layout, unsafe, Cargo, edition, rustdoc, lint, MSRV, or SemVer semantics, verify it against [rust-official-standards.md](rust-official-standards.md) and the official document matching the pinned toolchain.
 
 ## Run Evidence First
 
